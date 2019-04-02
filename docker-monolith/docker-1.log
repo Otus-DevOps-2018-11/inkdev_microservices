@@ -1,0 +1,4 @@
+REPOSITORY                       TAG                 IMAGE ID            CREATED             SIZE
+alexeybogdanov/ubuntu-tmp-file   latest              c988144f2691        2 minutes ago       118MB
+ubuntu                           16.04               9361ce633ff1        3 weeks ago         118MB
+hello-world                      latest              fce289e99eb9        3 months ago        1.84kB
