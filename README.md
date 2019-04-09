@@ -31,4 +31,79 @@ docker rmi $(docker images -q) #rmi удаляет image, если от него
 запущенные контейнеры
 ```
 
+# Домашнее задание №15(docker-2)
+Полезные команды
+```
+docker-machine create <имя> Создание хоста для докер-демона с указанным образом в провайдере(в GCP)
+eval $(docker-machine env <имя>) Переключение между контейнерами
+eval $(docker-machine env --unset) Переключение на локальный докер
+docker-machine rm <имя> Удаление
+docker build -t reddit:latest . #Сборка образа. Точка в конце-путь до docker-контекста
+```
 
+
+Исследованы команды
+```
+docker run --rm -ti tehbilly/htop
+```
+В данном случае видим только один запущенный процесс внутри контейнера, процессы хостовой машины не наблюдаем
+
+```
+docker run --rm --pid host -ti tehbilly/htop
+```
+В этом случае внутри контейнера будем видеть все процессы, запущенные на хостовой машине 
+
+## Docker-hub
+```
+docker run --name reddit -d --network=host reddit:latest #Запуск контейнера
+```
+Регистрация на https://hub.docker.com/
+Аутентификация на docker-hub
+```
+$ docker login
+Login with your Docker ID to push and pull images from Docker Hub.
+If you don't have a Docker ID, head over to https://hub.docker.com to create one.
+Username: your-login
+Password:
+Login Succeeded
+```
+
+Загрузка образа на docker hub
+```
+$ docker tag reddit:latest <your-login>/otus-reddit:1.0
+$ docker push <your-login>/otus-reddit:1.0
+The push refers to a repository [docker.io/<your-login>/otus-reddit]
+c6e5100de1e0: Pushed
+...
+a2022691bf95: Pushed
+1.0: digest:
+sha256:77c6070400a5b04f8db3f7c129a2c16084c2fcf186aa6b436c8d6f57e0014378 size:
+3448
+```
+Запсукаем с другой машины и проверяем работу контейнера
+```
+docker run --name reddit -d -p 9292:9292 <your-login>/otus-reddit:1.0
+```
+Дополнительная работа с контейнером
+```
+docker logs reddit -f #логи
+docker exec -it reddit bash #зайти в контейнер
+ ps aux 
+ killall5 1
+docker start reddit стартуем заново
+docker stop reddit && docker rm reddit установить и удалить
+docker inspect <your-login>/otus-reddit:1.0 подробная инфа об образе
+docker inspect <your-login>/otus-reddit:1.0 -f '{{.ContainerConfig.Cmd}}' вывести определенный фрагмент
+docker run --name reddit -d -p 9292:9292 <your-login>/otus-reddit:1.0 запустить приложение
+```
+
+### Задание со *
+- В папке docker-monolith/infra создали проект, позволяющий развернуть инстансы с установленным приложением на базе docker внутри
+- Опиcали поднятие инстансов с помощью Terraform, количество количество которых  задается с помощью переменной  node_count
+- Описали сценарии поднятия Docker и развертывания контейнера внутри с установленным приложением reddit с помощью динамического инвентори terraform-inventory
+```
+TF_STATE=../terraform ansible-playbook playbooks/reddit-docker.yml
+```
+Поднятие Docker реализовали через роль из ansible-galaxy geerlingguy.docker
+- Создали шаблон пакера с запеченным внутри Docker docker-reddit-1554813982
+- Развернули указанные инстансы и плейбуки, проверили работоспособность приложения
