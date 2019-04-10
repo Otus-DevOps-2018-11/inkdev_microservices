@@ -107,3 +107,155 @@ TF_STATE=../terraform ansible-playbook playbooks/reddit-docker.yml
 Поднятие Docker реализовали через роль из ansible-galaxy geerlingguy.docker
 - Создали шаблон пакера с запеченным внутри Docker docker-reddit-1554813982
 - Развернули указанные инстансы и плейбуки, проверили работоспособность приложения
+
+
+# Домашнее задание №16(docker-3)
+Полезные команды
+```
+docker pull mongo:latest #Скачиваем последний образ MongoDB
+docker build -t inks/post:1.0 ./post-py
+docker build -t inks/comment:1.0 ./comment
+docker build -t inks/ui:1.0 ./ui # Сборка контейнеров
+```
+
+- Создаем три контейнера для каждого микросервиса post-py, comment, ui
+Сборка ui началась не с первого шага, потому что остались предыдущие слои от сбора контейнера comment
+- Проверяем с помощью линтера hadolint Dockerfile в каждой из папок
+Сайт проекта 
+https://github.com/hadolint/hadolint
+Установка hadolint
+```
+docker pull hadolint/hadolint
+```
+Проверка Dockerfile
+```
+docker run --rm -i hadolint/hadolint < Dockerfile
+```
+Проверили все Dockerfile, исправили ошибки кроме версионирования пакетов
+
+- Создаем docker bridge  сеть
+```
+docker network create reddit
+docker network ls
+NETWORK ID          NAME                DRIVER              SCOPE
+c9b65fe3a70b        bridge              bridge              local
+872151e2863b        host                host                local
+0ed4f163576f        none                null                local
+f4b77fa58ff9        reddit              bridge              local
+```
+- Запускаем контейнеры и добавляем сетевые алиасы
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db mongo:latest
+docker run -d --network=reddit --network-alias=post inks/post:1.0
+docker run -d --network=reddit --network-alias=comment inks/comment:1.0
+docker run -d --network=reddit -p 9292:9292 inks/ui:1.0
+```
+- Проверяем
+```
+docker ps -a
+CONTAINER ID        IMAGE               COMMAND                  CREATED              STATUS                        PORTS                    NAMES
+a87ea02f398c        inks/ui:1.0         "puma"                   About a minute ago   Up About a minute             0.0.0.0:9292->9292/tcp   silly_dubinsky
+a00059c7c9ec        inks/comment:1.0    "puma"                   About a minute ago   Up About a minute                                      silly_matsumoto
+7d9a27ef2545        inks/post:1.0       "python3 post_app.py"    About a minute ago   Up About a minute                                      hungry_curie
+d1de3826414d        mongo:latest        "docker-entrypoint.s…"   About a minute ago   Up About a minute             27017/tcp                zealous_babbage
+```
+
+### Задание со * №1
+- Останавливаем контейнеры
+```
+docker kill $(docker ps -q)
+```
+- Запускаем контейнеры с другими сетевыми алиасами , подерживаем взаимодействие через ENV переменные
+```
+docker run -d --network=reddit --network-alias=post_db_new --network-alias=comment_db_new mongo:latest \
+&& docker run -d --network=reddit --network-alias=post_new --env POST_DATABASE_HOST=post_db_new inks/post:1.0 \
+&& docker run -d --network=reddit --network-alias=comment_new --env COMMENT_DATABASE_HOST=comment_db_new inks/comment:1.0 \
+&& docker run -d --network=reddit --env POST_SERVICE_HOST=post_new --env COMMENT_SERVICE_HOST=comment_new -p 9292:9292 inks/ui:1.0
+```
+- Проверяем работоспособность приложения
+```
+curl http://external_ip:9292
+```
+### Продолжение основного задания
+
+- Улучшаем образ ui, пересобираем контейнер с помощью нового Dockerfile
+- Пересобираем ui
+```
+docker build -t inks/ui:2.0 ./ui
+```
+Проверяем, образ уменьшился до 447 Мб
+```
+ docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED              SIZE
+inks/ui             2.0                 cbd3055df020        About a minute ago   447MB
+inks/ui             1.0                 4e934e3b4354        4 hours ago          958MB
+inks/comment        1.0                 64fd9ba575f1        14 hours ago         956MB
+inks/post           1.0                 aed6599b931b        15 hours ago         206MB
+```
+
+### Задание со * №2
+- Применяем Alpine для уменьшения размера образа
+```
+FROM alpine
+RUN apk add --no-cache build-base ruby ruby-bundler ruby-dev ruby-json \
+    && gem install bundler --no-ri --no-rdoc
+```
+Пересобираем образ 
+```
+docker build -t inks/ui:3.0 ./ui
+```
+Образ сжался до 228 Мб
+```
+docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+inks/ui             3.0                 9b78bf6f5ffa        2 minutes ago       228MB
+inks/ui             2.0                 cbd3055df020        17 minutes ago      447MB
+inks/ui             1.0                 4e934e3b4354        5 hours ago         958MB
+```
+- Уменьшаем образ за счет удаления ненужных библиотек и чистки кэша. Итоговый образ занимает 38.6 Мб
+```
+docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+inks/ui             4.0                 6d81c7ee0a19        11 seconds ago      38.6MB
+inks/ui             3.0                 9b78bf6f5ffa        About an hour ago   228MB
+inks/ui             2.0                 cbd3055df020        About an hour ago   447MB
+inks/ui             1.0                 4e934e3b4354        6 hours ago         958MB
+alpine              latest              cdf98d1859c1        13 hours ago        5.53MB
+inks/comment        1.0                 64fd9ba575f1        15 hours ago        956MB
+inks/post           1.0                 aed6599b931b        16 hours ago        206MB
+
+```
+- Аналогично применяем для создания образов post-py и comment. Образы удалось сжать до 107 и 35.7 Мб соответственно
+```
+docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+inks/comment        2.0                 c633c5a7cded        6 seconds ago       35.7MB
+inks/post           2.0                 f2a9fce39e3b        14 minutes ago      107MB
+inks/ui             4.0                 6d81c7ee0a19        32 minutes ago      38.6MB
+inks/ui             3.0                 9b78bf6f5ffa        2 hours ago         228MB
+inks/ui             2.0                 cbd3055df020        2 hours ago         447MB
+inks/ui             1.0                 4e934e3b4354        6 hours ago         958MB
+alpine              latest              cdf98d1859c1        14 hours ago        5.53MB
+inks/comment        1.0                 64fd9ba575f1        16 hours ago        956MB
+inks/post           1.0                 aed6599b931b        17 hours ago        206MB
+```
+
+- Останаваливаем контейнеры, поднимаем новые из свежих образов
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db mongo:latest \
+&& docker run -d --network=reddit --network-alias=post inks/post:2.0 \
+&& docker run -d --network=reddit --network-alias=comment inks/comment:2.0 \
+&& docker run -d --network=reddit -p 9292:9292 inks/ui:4.0
+```
+- Создадим Docker volume для исключения удаления данных в случае остановки контейнера
+```
+docker volume create reddit_db
+```
+- Отключаем старые копии контейнеров и пересоздаем с подключеннным хранилищем
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db -v reddit_db:/data/db mongo:latest \
+&& docker run -d --network=reddit --network-alias=post inks/post:2.0 \
+&& docker run -d --network=reddit --network-alias=comment inks/comment:2.0 \
+&& docker run -d --network=reddit -p 9292:9292 inks/ui:4.0
+```
+- Создаем новый пост, пересоздаем контейнеры и убеждаемся, что пост остался на месте
