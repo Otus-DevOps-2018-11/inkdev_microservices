@@ -259,3 +259,354 @@ docker run -d --network=reddit --network-alias=post_db --network-alias=comment_d
 && docker run -d --network=reddit -p 9292:9292 inks/ui:4.0
 ```
 - Создаем новый пост, пересоздаем контейнеры и убеждаемся, что пост остался на месте
+
+
+# Домашнее задание №17(docker-4)
+Полезные команды
+```
+eval $(docker-machine env docker-host)
+docker kill $(docker ps -q)
+export USERNAME=inks
+docker-compose up -d
+docker-compose ps
+docker-compose down 
+```
+- Проверяем режим работы сети none
+```
+ docker run -ti --rm --network none joffotron/docker-net-tools -c ifconfig
+```
+Убеждаемся, что из интерфейсов на борту есть только loopback
+```
+lo        Link encap:Local Loopback
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+
+```
+- Проверяем режим работы сети host c host network driver
+```
+docker run -ti --rm --network host joffotron/docker-net-tools -c ifconfig
+```
+
+В выводе указаны хостовые и виртуальные интерфейсы контейнеров
+```
+docker run -ti --rm --network host joffotron/docker-net-tools -c ifconfig
+br-f4b77fa58ff9 Link encap:Ethernet  HWaddr 02:42:E0:F8:C1:C9
+          inet addr:172.18.0.1  Bcast:172.18.255.255  Mask:255.255.0.0
+          inet6 addr: fe80::42:e0ff:fef8:c1c9%32521/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:1814 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:1866 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:124578 (121.6 KiB)  TX bytes:251997 (246.0 KiB)
+
+docker0   Link encap:Ethernet  HWaddr 02:42:D7:EB:36:02
+          inet addr:172.17.0.1  Bcast:172.17.255.255  Mask:255.255.0.0
+          inet6 addr: fe80::42:d7ff:feeb:3602%32521/64 Scope:Link
+          UP BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:24360 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:29829 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:2143059 (2.0 MiB)  TX bytes:649063556 (618.9 MiB)
+
+ens4      Link encap:Ethernet  HWaddr 42:01:0A:84:00:07
+          inet addr:10.132.0.7  Bcast:10.132.0.7  Mask:255.255.255.255
+          inet6 addr: fe80::4001:aff:fe84:7%32521/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1460  Metric:1
+          RX packets:108627 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:89453 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:1246663539 (1.1 GiB)  TX bytes:9746866 (9.2 MiB)
+
+lo        Link encap:Local Loopback
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1%32521/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+
+veth16e2ec7 Link encap:Ethernet  HWaddr 6E:6D:89:92:01:26
+          inet6 addr: fe80::6c6d:89ff:fe92:126%32521/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:639568 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:465058 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:70757477 (67.4 MiB)  TX bytes:69569031 (66.3 MiB)
+
+veth9fe1eba Link encap:Ethernet  HWaddr 9A:DC:10:87:97:40
+          inet6 addr: fe80::98dc:10ff:fe87:9740%32521/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:522250 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:796277 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:82230092 (78.4 MiB)  TX bytes:86340741 (82.3 MiB)
+
+vethd4e4640 Link encap:Ethernet  HWaddr 1A:3A:AB:03:BC:02
+          inet6 addr: fe80::183a:abff:fe03:bc02%32521/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:298713 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:256133 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:32042795 (30.5 MiB)  TX bytes:35577615 (33.9 MiB)
+
+vethfa0e33b Link encap:Ethernet  HWaddr 62:35:5E:5B:70:9C
+          inet6 addr: fe80::6035:5eff:fe5b:709c%32521/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:198841 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:142132 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:22912711 (21.8 MiB)  TX bytes:16470505 (15.7 MiB)
+
+```
+Соответствует выводу команды
+```
+docker-machine ssh docker-host ifconfig
+```
+
+- Запускаем 4 раза команду
+```
+docker run --network host -d nginx
+```
+Вывод docker ps при этом
+```
+9db9f63f09ac        nginx               "nginx -g 'daemon of…"   About a minute ago   Exited (1) About a minute ago                            upbeat_jepsen
+b606bcaa642d        nginx               "nginx -g 'daemon of…"   About a minute ago   Exited (1) About a minute ago                            lucid_shannon
+45f3a1e4dde5        nginx               "nginx -g 'daemon of…"   About a minute ago   Exited (1) About a minute ago                            determined_mcclintock
+fd2610a78bfe        nginx               "nginx -g 'daemon of…"   About a minute ago   Up About a minute                                        romantic_sinoussi
+
+```
+Статуc "Exited" говорит о том, что контейнер не запущен, потому что nginx первого контейнера занял 80 порт, остальные не могут его задествовать
+
+- Останавливаем контейнеры 
+```
+ docker kill $(docker ps -q)
+
+```
+- Docker networks.
+На docker-host выполняем команду
+```
+docker-machine ssh docker-host
+sudo ln -s /var/run/docker/netns /var/run/netns
+$ sudo ip netns
+default
+```
+- Изменение списка namespace в зависимости от выбранного драйвера none или host
+ - none
+   ```
+   docker run -d --network none joffotron/docker-net-tools
+   $docker-machine ssh docker-host 'sudo ip netns'
+   6de67dcdbe1c
+   default
+   RTNETLINK answers: Invalid argument
+   RTNETLINK answers: Invalid argument
+
+   ```
+ - host
+   ```
+   docker run -d --network host joffotron/docker-net-tools
+   $ docker-machine ssh docker-host 'sudo ip netns'
+   default
+   ```
+- Bridge network driver
+
+```
+docker run -d --network=reddit mongo:latest \
+&& docker run -d --network=reddit inks/post:1.0 \
+&& docker run -d --network=reddit inks/comment:1.0 \
+&& docker run -d --network=reddit -p 9292:9292 inks/ui:1.0
+```
+У контейнеров не выполняется сетевое взаимодействие, так как они ссылаются друг на друга в ENV переменных
+Исправим с помощью алиасов
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db mongo:latest
+docker run -d --network=reddit --network-alias=post inks/post:1.0
+docker run -d --network=reddit --network-alias=comment inks/comment:1.0
+docker run -d --network=reddit -p 9292:9292 inks/ui:1.0
+```
+- Разносим проект по двум bridge-сетям, чтобы ui не имел доступа к БД
+создаем две docker-сети 
+```
+> docker network create back_net --subnet=10.0.2.0/24
+> docker network create front_net --subnet=10.0.1.0/24
+```
+Поднимаем Ui в сети front_net
+```
+docker run -d --network=front_net -p 9292:9292 --name ui inks/ui:1.0 \
+&& docker run -d --network=back_net --name comment inks/comment:1.0 \
+&& docker run -d --network=back_net --name post inks/post:1.0 \
+&& docker run -d --network=back_net --name mongo_db --network-alias=post_db --network-alias=comment_db mongo:latest
+```
+Для успешного результата подключаем контейнеры ко второй сети
+```
+docker network connect front_net post
+docker network connect front_net comment 
+```
+- Вывод сетевого стека на Linux
+```
+sudo docker network ls
+NETWORK ID          NAME                DRIVER              SCOPE
+1af0dc47e1eb        back_net            bridge              local
+c9b65fe3a70b        bridge              bridge              local
+a8f44c0cd95a        front_net           bridge              local
+872151e2863b        host                host                local
+0ed4f163576f        none                null                local
+f4b77fa58ff9        reddit              bridge              local
+```
+- Сделаем выборку по bridge-интерфейсам
+```
+$ ifconfig | grep br
+br-1af0dc47e1eb Link encap:Ethernet  HWaddr 02:42:7f:0a:b0:0e
+br-a8f44c0cd95a Link encap:Ethernet  HWaddr 02:42:80:04:47:8b
+br-f4b77fa58ff9 Link encap:Ethernet  HWaddr 02:42:e0:f8:c1:c9
+```
+- Рассмотрим один из них более подробно
+```
+$ brctl show br-1af0dc47e1eb
+bridge name     bridge id               STP enabled     interfaces
+br-1af0dc47e1eb         8000.02427f0ab00e       no              veth3d520db
+                                                        veth7477b93
+                                                        vethb8598e8
+
+```
+- Вывод iptables
+```
+sudo iptables -nL -t nat
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination
+DOCKER     all  --  0.0.0.0/0            0.0.0.0/0            ADDRTYPE match dst-type LOCAL
+
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination
+DOCKER     all  --  0.0.0.0/0           !127.0.0.0/8          ADDRTYPE match dst-type LOCAL
+
+Chain POSTROUTING (policy ACCEPT)
+target     prot opt source               destination
+MASQUERADE  all  --  10.0.1.0/24          0.0.0.0/0
+MASQUERADE  all  --  10.0.2.0/24          0.0.0.0/0
+MASQUERADE  all  --  172.18.0.0/16        0.0.0.0/0
+MASQUERADE  all  --  172.17.0.0/16        0.0.0.0/0
+MASQUERADE  tcp  --  10.0.1.2             10.0.1.2             tcp dpt:9292
+
+Chain DOCKER (2 references)
+target     prot opt source               destination
+RETURN     all  --  0.0.0.0/0            0.0.0.0/0
+RETURN     all  --  0.0.0.0/0            0.0.0.0/0
+RETURN     all  --  0.0.0.0/0            0.0.0.0/0
+RETURN     all  --  0.0.0.0/0            0.0.0.0/0
+DNAT       tcp  --  0.0.0.0/0            0.0.0.0/0            tcp dpt:9292 to:10.0.1.2:9292 #Перенаправлние трафика
+```
+
+- Проверяем работу docker-proxy
+```
+ps ax | grep docker-proxy
+29655 ?        Sl     0:00 /usr/bin/docker-proxy -proto tcp -host-ip 0.0.0.0 -host-port 9292 -container-ip 10.0.1.2 -container-port 9292
+
+```
+
+### Работа c Docker-compose
+- Описываем поднятие инфраструктуры в файле docker-compose.yml
+- Останавливаем контейнеры и задаем переменную окружения 
+```
+export USERNAME=inks
+```
+- Применяем и проверяем запущенную инфраструктуру
+```
+docker-compose up -d
+$ docker-compose ps
+    Name                  Command             State           Ports
+----------------------------------------------------------------------------
+src_comment_1   puma                          Up
+src_post_1      python3 post_app.py           Up
+src_post_db_1   docker-entrypoint.sh mongod   Up      27017/tcp
+src_ui_1        puma                          Up      0.0.0.0:9292->9292/tcp
+```
+
+- Описываем в файле docker-compose поднятие контейнеров с сетями front_net, back_net и сетевыми алиасами
+Проверяем
+```
+$ docker-compose ps
+    Name                  Command             State           Ports
+----------------------------------------------------------------------------
+src_comment_1   puma                          Up
+src_post_1      python3 post_app.py           Up
+src_post_db_1   docker-entrypoint.sh mongod   Up      27017/tcp
+src_ui_1        puma                          Up      0.0.0.0:9292->9292/tcp
+```
+- Параметризуем с помощью переменных окружений публикуемый наружу порт ui, верcии сервисов ui, post, comment и версию mongodb. Параметры внесем в файл .env, который docker-compose подхватит при развертывании. Файл .env внесли в .gitignore. Проверим доступность приложения
+- Базовое имя текущего проекта src
+```
+Creating network "src_back_net" with the default driver
+Creating network "src_front_net" with the default driver
+Creating src_ui_1      ... done
+Creating src_comment_1 ... done
+Creating src_post_1    ... done
+Creating src_post_db_1 ... done
+```
+Название берется из текущей папки src, где находится файл docker-compose
+Изменить можно с помощью переменной окружения
+```
+COMPOSE_PROJECT_NAME=dockermicroservices 
+```
+Проверяем
+```
+docker-compose up -d
+Creating network "dockermicroservices_back_net" with the default driver
+Creating network "dockermicroservices_front_net" with the default driver
+Creating volume "dockermicroservices_post_db" with default driver
+Creating dockermicroservices_comment_1 ... done
+Creating dockermicroservices_post_db_1 ... done
+Creating dockermicroservices_post_1    ... done
+Creating dockermicroservices_ui_1      ... done
+
+```
+ 
+### Задание со *
+
+Для того, чтобы реализовать изменение кода без сборки образа , подключим необходимые файлs в качестве volume'ов
+
+```
+docker-machine scp -r ./src docker-host:/home/docker-user/
+```
+Подключаемся, проверяем доступность папки src
+```
+docker-machine ssh docker-host
+ls -al /src
+```
+ - Добавляем в запуск пумы и руби два воркера(флаги --debug и -w 2) с помощью конструкции entrypoint
+
+```
+ entrypoint:
+    - puma
+    - --debug
+    - -w 2
+```
+- Сводим в итоговый файл сценария docker-compose.override.yml
+- Поднимаем инфраструктуру
+```
+ docker-compose up -d
+Creating network "src_front_net" with the default driver
+Creating network "src_back_net" with the default driver
+Creating src_comment_1 ... done
+Creating src_post_db_1 ... done
+Creating src_post_1    ... done
+Creating src_ui_1      ... done
+```
+- Создаем пост со ссылкой, перезапускаем контейнеры, убеждаемся, что благодарая volume пост остался на месте. Проверяем наличие воркеров
+```
+$ docker-compose ps
+    Name                  Command             State           Ports
+----------------------------------------------------------------------------
+src_comment_1   puma --debug -w 2             Up
+src_post_1      python3 post_app.py           Up
+src_post_db_1   docker-entrypoint.sh mongod   Up      27017/tcp
+src_ui_1        puma --debug -w 2             Up      0.0.0.0:9292->9292/tcp
+```
+
