@@ -775,5 +775,10 @@ production:
    name: production
    url: https://example.com
 ```
+- Добавляем в пайплайн директиву, не позволяющую деплоить в окружения stage и prod без тега git
+```
+only:
+   - /^\d+\.\d+\.\d+/
+```
 
 
