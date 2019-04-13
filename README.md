@@ -610,3 +610,80 @@ src_post_db_1   docker-entrypoint.sh mongod   Up      27017/tcp
 src_ui_1        puma --debug -w 2             Up      0.0.0.0:9292->9292/tcp
 ```
 
+### Домашнее задание №19(gitlab-ci)
+- Поднимаем инстанс в GCP
+- Устанавливаем Docker
+- Подготавливаем окружение для gitlab и omnibus установки
+```
+# mkdir -p /srv/gitlab/config /srv/gitlab/data /srv/gitlab/logs
+# cd /srv/gitlab/
+# touch docker-compose.yml
+
+web:
+  image: 'gitlab/gitlab-ce:latest'
+  restart: always
+  hostname: 'gitlab.example.com'
+  environment:
+    GITLAB_OMNIBUS_CONFIG: |
+      external_url 'http://<YOUR-VM-IP>'
+  ports:
+    - '80:80'
+    - '443:443'
+    - '2222:22'
+  volumes:
+    - '/srv/gitlab/config:/etc/gitlab'
+    - '/srv/gitlab/logs:/var/log/gitlab'
+    - '/srv/gitlab/data:/var/opt/gitlab'
+
+```
+- Запускаем gitlab
+```
+docker-compose up -d
+```
+- Заходим, создаем группу homework
+- Создаем проект example
+- Добавляем remote в свой репозиторий
+```
+> git checkout -b gitlab-ci-1
+> git remote add gitlab http://<your-vm-ip>/homework/example.git
+> git push gitlab gitlab-ci-1
+```
+- Добавляем пайплайн c помощью файла gitlab-ci.yml
+- Сохраняем, пушим и проверяем, что пайплайн готов к старту
+```
+> git add .gitlab-ci.yml
+> git commit -m 'add pipeline definition'
+> git push gitlab gitlab-ci-1
+```
+- Создаем раннер на сервере Gitlab
+```
+sudo docker run -d --name gitlab-runner --restart always \
+-v /srv/gitlab-runner/config:/etc/gitlab-runner \
+-v /var/run/docker.sock:/var/run/docker.sock \
+gitlab/gitlab-runner:latest 
+
+```
+- Регистрируем раннер
+```
+sudo docker exec -it gitlab-runner gitlab-runner register --run-untagged --locked=false
+```
+- Заполняем интерактивный опрос и получаем работающий раннер
+```
+Please enter the gitlab-ci coordinator URL (e.g. https://gitlab.com/):
+http://<YOUR-VM-IP>/
+Please enter the gitlab-ci token for this runner:
+<TOKEN>
+Please enter the gitlab-ci description for this runner:
+[38689f5588fe]: my-runner
+Please enter the gitlab-ci tags for this runner (comma separated):
+linux,xenial,ubuntu,docker
+Please enter the executor:
+docker
+Please enter the default Docker image (e.g. ruby:2.1):
+alpine:latest
+Runner registered successfully.
+
+```
+
+- Провреряем статус через CI/CD pipeline
+
