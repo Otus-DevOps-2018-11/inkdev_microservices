@@ -780,5 +780,10 @@ production:
 only:
    - /^\d+\.\d+\.\d+/
 ```
-
+- Проверяем с тегом
+```
+git commit -a -m ‘#4 add logout button to profile page’
+git tag 2.4.10
+git push gitlab gitlab-ci-1 --tags
+```
 
