@@ -4,3 +4,4 @@ docker-monolith/infra/packer/variables.json
 *.tfstate.backup
 *.tfvars
 docker-monolith/infra/terraform/.terraform/
+.env
