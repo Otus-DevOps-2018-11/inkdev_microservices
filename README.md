@@ -747,4 +747,33 @@ deploy_dev_job:
  name: dev
  url: http://dev.example.com
 ```
+- Проверяем окружение в Operations-Environments
+- Определяем еще два окружения Staging И Production. Добавляем запуск с кнопки
+```
+stages:
+ - build
+ - test
+ - review
+ - stage
+ - production
+
+staging:
+ stage: stage
+ when: manual
+ script:
+   - echo 'Deploy'
+ environment:
+   name: stage
+   url: https://beta.example.com
+
+production:
+ stage: production
+ when: manual
+ script:
+   - echo 'Deploy'
+ environment:
+   name: production
+   url: https://example.com
+```
+
 
