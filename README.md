@@ -686,4 +686,65 @@ Runner registered successfully.
 ```
 
 - Провреряем статус через CI/CD pipeline
+- Добавляем приложение Reddit в наш репозиторий
+- Изменяем пайплайн для запуска теста
+```
+image: ruby:2.4.2
+stages:
+...
+variables:
+ DATABASE_URL: 'mongodb://mongo/user_posts'
+before_script:
+ - cd reddit
+ - bundle install
+...
+test_unit_job:
+ stage: test
+ services:
+ - mongo:latest
+ script:
+ - ruby simpletest.rb 
+```
+- Пишем сам тест simpletest.rb
+```
+require_relative './app'
+require 'test/unit'
+require 'rack/test'
+set :environment, :test
+class MyAppTest < Test::Unit::TestCase
+ include Rack::Test::Methods
+ def app
+ Sinatra::Application
+ end
+ def test_get_request
+ get '/'
+ assert last_response.ok?
+ end
+end
+```
+- Добавляем бибилиотеку тестирования в Gemfile
+```
+gem 'rack-test'
+```
+- Изменяем пайплайн, чтобы при job deploy код выкатывался на окружение dev
+```
+stages:
+ - build
+ - test
+ - review
+...
+build_job:
+...
+test_unit_job:
+...
+test_integration_job:
+...
+deploy_dev_job:
+ stage: review
+ script:
+ - echo 'Deploy'
+ environment:
+ name: dev
+ url: http://dev.example.com
+```
 
