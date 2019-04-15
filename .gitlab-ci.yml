@@ -10,7 +10,8 @@ stages:
 variables:
  DATABASE_URL: 'mongodb://mongo/user_posts'
 
-#before_script:
+before_script:
+  - docker info
 # - cd reddit
 # - bundle install 
 
