@@ -31,8 +31,8 @@ build_job:
   services:
     - docker:dind
   script:
-    - docker build -t reddit:latest docker-monolith
-    - docker run --name reddit -d --network=host reddit:latest
+    - sudo docker build -t reddit:latest docker-monolith
+    - sudo docker run --name reddit -d --network=host reddit:latest
 #    - echo 'Building'
 #    - docker build -t $REGISTRY_USER/reddit:$CI_COMMIT_SHORT_SHA .
 #    - echo $REGISTRY_PASSWORD | docker login --username $REGISTRY_USER --password-stdin 
