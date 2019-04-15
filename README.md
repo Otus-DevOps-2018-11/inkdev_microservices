@@ -788,14 +788,16 @@ git push gitlab gitlab-ci-1 --tags
 ```
 
 - Динамические окружения
+Добавляем job, который определяет динамическое окружение для всех веток в репозитории, кроме ветки master
 ```
-```
-
-### Задание со * №1
-- Добавляем сборку контейнера с приложением reddit
-Для этого подключаем внутренний docker-host Registry
-Документация: https://docs.gitlab.com/omnibus/docker/
-- В файле gitlab.rb меняем
-```
-sudo docker exec -it gitlab editor /etc/gitlab/gitlab.rb 
+branch review:
+ stage: review
+ script: echo "Deploy to $CI_ENVIRONMENT_SLUG"
+ environment:
+ name: branch/$CI_COMMIT_REF_NAME
+ url: http://$CI_ENVIRONMENT_SLUG.example.com
+ only:
+ - branches
+ except:
+ - master
 ```
