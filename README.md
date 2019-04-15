@@ -610,3 +610,194 @@ src_post_db_1   docker-entrypoint.sh mongod   Up      27017/tcp
 src_ui_1        puma --debug -w 2             Up      0.0.0.0:9292->9292/tcp
 ```
 
+### Домашнее задание №19(gitlab-ci)
+- Поднимаем инстанс в GCP
+- Устанавливаем Docker
+- Подготавливаем окружение для gitlab и omnibus установки
+```
+# mkdir -p /srv/gitlab/config /srv/gitlab/data /srv/gitlab/logs
+# cd /srv/gitlab/
+# touch docker-compose.yml
+
+web:
+  image: 'gitlab/gitlab-ce:latest'
+  restart: always
+  hostname: 'gitlab.example.com'
+  environment:
+    GITLAB_OMNIBUS_CONFIG: |
+      external_url 'http://<YOUR-VM-IP>'
+  ports:
+    - '80:80'
+    - '443:443'
+    - '2222:22'
+  volumes:
+    - '/srv/gitlab/config:/etc/gitlab'
+    - '/srv/gitlab/logs:/var/log/gitlab'
+    - '/srv/gitlab/data:/var/opt/gitlab'
+
+```
+- Запускаем gitlab
+```
+docker-compose up -d
+```
+- Заходим, создаем группу homework
+- Создаем проект example
+- Добавляем remote в свой репозиторий
+```
+> git checkout -b gitlab-ci-1
+> git remote add gitlab http://<your-vm-ip>/homework/example.git
+> git push gitlab gitlab-ci-1
+```
+- Добавляем пайплайн c помощью файла gitlab-ci.yml
+- Сохраняем, пушим и проверяем, что пайплайн готов к старту
+```
+> git add .gitlab-ci.yml
+> git commit -m 'add pipeline definition'
+> git push gitlab gitlab-ci-1
+```
+- Создаем раннер на сервере Gitlab
+```
+sudo docker run -d --name gitlab-runner --restart always \
+-v /srv/gitlab-runner/config:/etc/gitlab-runner \
+-v /var/run/docker.sock:/var/run/docker.sock \
+gitlab/gitlab-runner:latest 
+
+```
+- Регистрируем раннер
+```
+sudo docker exec -it gitlab-runner gitlab-runner register --run-untagged --locked=false
+```
+- Заполняем интерактивный опрос и получаем работающий раннер
+```
+Please enter the gitlab-ci coordinator URL (e.g. https://gitlab.com/):
+http://<YOUR-VM-IP>/
+Please enter the gitlab-ci token for this runner:
+<TOKEN>
+Please enter the gitlab-ci description for this runner:
+[38689f5588fe]: my-runner
+Please enter the gitlab-ci tags for this runner (comma separated):
+linux,xenial,ubuntu,docker
+Please enter the executor:
+docker
+Please enter the default Docker image (e.g. ruby:2.1):
+alpine:latest
+Runner registered successfully.
+
+```
+
+- Провреряем статус через CI/CD pipeline
+- Добавляем приложение Reddit в наш репозиторий
+- Изменяем пайплайн для запуска теста
+```
+image: ruby:2.4.2
+stages:
+...
+variables:
+ DATABASE_URL: 'mongodb://mongo/user_posts'
+before_script:
+ - cd reddit
+ - bundle install
+...
+test_unit_job:
+ stage: test
+ services:
+ - mongo:latest
+ script:
+ - ruby simpletest.rb 
+```
+- Пишем сам тест simpletest.rb
+```
+require_relative './app'
+require 'test/unit'
+require 'rack/test'
+set :environment, :test
+class MyAppTest < Test::Unit::TestCase
+ include Rack::Test::Methods
+ def app
+ Sinatra::Application
+ end
+ def test_get_request
+ get '/'
+ assert last_response.ok?
+ end
+end
+```
+- Добавляем бибилиотеку тестирования в Gemfile
+```
+gem 'rack-test'
+```
+- Изменяем пайплайн, чтобы при job deploy код выкатывался на окружение dev
+```
+stages:
+ - build
+ - test
+ - review
+...
+build_job:
+...
+test_unit_job:
+...
+test_integration_job:
+...
+deploy_dev_job:
+ stage: review
+ script:
+ - echo 'Deploy'
+ environment:
+ name: dev
+ url: http://dev.example.com
+```
+- Проверяем окружение в Operations-Environments
+- Определяем еще два окружения Staging И Production. Добавляем запуск с кнопки
+```
+stages:
+ - build
+ - test
+ - review
+ - stage
+ - production
+
+staging:
+ stage: stage
+ when: manual
+ script:
+   - echo 'Deploy'
+ environment:
+   name: stage
+   url: https://beta.example.com
+
+production:
+ stage: production
+ when: manual
+ script:
+   - echo 'Deploy'
+ environment:
+   name: production
+   url: https://example.com
+```
+- Добавляем в пайплайн директиву, не позволяющую деплоить в окружения stage и prod без тега git
+```
+only:
+   - /^\d+\.\d+\.\d+/
+```
+- Проверяем с тегом
+```
+git commit -a -m ‘#4 add logout button to profile page’
+git tag 2.4.10
+git push gitlab gitlab-ci-1 --tags
+```
+
+- Динамические окружения
+Добавляем job, который определяет динамическое окружение для всех веток в репозитории, кроме ветки master
+```
+branch review:
+ stage: review
+ script: echo "Deploy to $CI_ENVIRONMENT_SLUG"
+ environment:
+ name: branch/$CI_COMMIT_REF_NAME
+ url: http://$CI_ENVIRONMENT_SLUG.example.com
+ only:
+ - branches
+ except:
+ - master
+```
