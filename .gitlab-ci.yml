@@ -27,13 +27,15 @@ branch review:
 
 build_job:
   stage: build
-  image: docker:stable
+ # image: docker:stable
   script:
-    - echo 'Building'
-    - docker build -t $REGISTRY_USER/reddit:$CI_COMMIT_SHORT_SHA .
-    - echo $REGISTRY_PASSWORD | docker login --username $REGISTRY_USER --password-stdin 
-    - docker push $REGISTRY_USER/reddit:$CI_COMMIT_SHORT_SHA
-    - docker rmi $REGISTRY_USER/reddit:$CI_COMMIT_SHORT_SHA
+    - sudo docker build -t reddit:latest ./reddit
+    - sudo docker run --name reddit -d --network=host reddit:latest
+#    - echo 'Building'
+#    - docker build -t $REGISTRY_USER/reddit:$CI_COMMIT_SHORT_SHA .
+#    - echo $REGISTRY_PASSWORD | docker login --username $REGISTRY_USER --password-stdin 
+#    - docker push $REGISTRY_USER/reddit:$CI_COMMIT_SHORT_SHA
+#    - docker rmi $REGISTRY_USER/reddit:$CI_COMMIT_SHORT_SHA
 
 test_unit_job:
   stage: test

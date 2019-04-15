@@ -790,3 +790,12 @@ git push gitlab gitlab-ci-1 --tags
 - Динамические окружения
 ```
 ```
+
+### Задание со * №1
+- Добавляем сборку контейнера с приложением reddit
+Для этого подключаем внутренний docker-host Registry
+Документация: https://docs.gitlab.com/omnibus/docker/
+- В файле gitlab.rb меняем
+```
+sudo docker exec -it gitlab editor /etc/gitlab/gitlab.rb 
+```
