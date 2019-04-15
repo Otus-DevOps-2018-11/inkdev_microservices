@@ -31,7 +31,7 @@ build_job:
   services:
     - docker:dind
   script:
-    - docker build -t reddit:latest ./reddit
+    - docker build -t reddit:latest docker-monolith
     - docker run --name reddit -d --network=host reddit:latest
 #    - echo 'Building'
 #    - docker build -t $REGISTRY_USER/reddit:$CI_COMMIT_SHORT_SHA .
