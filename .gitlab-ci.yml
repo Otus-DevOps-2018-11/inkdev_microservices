@@ -29,8 +29,8 @@ build_job:
   stage: build
  # image: docker:stable
   script:
-    - sudo docker build -t reddit:latest ./reddit
-    - sudo docker run --name reddit -d --network=host reddit:latest
+    - docker build -t reddit:latest ./reddit
+    - docker run --name reddit -d --network=host reddit:latest
 #    - echo 'Building'
 #    - docker build -t $REGISTRY_USER/reddit:$CI_COMMIT_SHORT_SHA .
 #    - echo $REGISTRY_PASSWORD | docker login --username $REGISTRY_USER --password-stdin 
