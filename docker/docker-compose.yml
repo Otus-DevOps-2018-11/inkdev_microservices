@@ -74,7 +74,7 @@ services:
       back_net:
   
   mongodb-exporter:
-    image: ${USER_NAME}/mongodb-exporter:latest
+    image: ${USERNAME}/mongodb-exporter:latest
     ports:
       - '9216:9216'
     command:
