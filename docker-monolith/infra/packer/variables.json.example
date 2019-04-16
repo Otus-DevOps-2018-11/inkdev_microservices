@@ -1,5 +1,0 @@
-{
-    "project_id": "docker-150150-test",
-    "source_image_family": "ubuntu-1604-lts",
-    "machine_type": "f1-micro"
-}

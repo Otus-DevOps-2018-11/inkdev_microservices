@@ -801,3 +801,179 @@ branch review:
  except:
  - master
 ```
+
+### Домашнее задание №20(monitoring-1)
+- Создаем инстанс в GCP, создаем правила, подключаем к docker-machine, скачиваем базовый образ prometheus, разворачиваем, изучаем интерфейс, останавливаем контейнер
+```
+$ gcloud compute firewall-rules create prometheus-default --allow tcp:9090 --project=docker-....
+
+$ gcloud compute firewall-rules create puma-default --allow tcp:9292
+
+$ export GOOGLE_PROJECT=_ваш-проект_
+
+# create docker host
+docker-machine create --driver google \
+    --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+    --google-machine-type n1-standard-1 \
+    --google-zone europe-west1-b \
+    docker-host
+
+# configure local env
+eval $(docker-machine env docker-host)
+
+$ docker run --rm -p 9090:9090 -d --name prometheus  prom/prometheus
+
+$ docker-machine ip docker-host
+
+$ docker stop prometheus
+```
+Metrics
+Targets-системы или процессы, за которыми следит prometheus
+- Создаем Dockerfile
+```
+FROM prom/prometheus:v2.1.0
+ADD prometheus.yml /etc/prometheus/
+```
+- Конфигурируем
+```
+---
+global:
+  scrape_interval: '5s' #частота сборки
+
+scrape_configs:
+  - job_name: 'prometheus' #Джобы объединяют в группы endpoint-ы,выполняющиеодинаковую функцию
+    static_configs:
+      - targets:
+        - 'localhost:9090' #Адреса для сбора метрик
+
+  - job_name: 'ui'
+    static_configs:
+      - targets:
+        - 'ui:9292'
+
+  - job_name: 'comment'
+    static_configs:
+      - targets:
+        - 'comment:9292'
+```
+- Собираем образ
+```
+$ export USER_NAME=username
+$ docker build -t $USER_NAME/prometheus .
+```
+- Собираем три контейнера с healthcheck со скриптами
+```
+for i in ui post-py comment; do cd src/$i; bash
+docker_build.sh; cd -; done
+```
+- Правим docker-compose.yml и .env файлы для билда посредством директивы image
+- Проверяем работоспособность reddit и prometheus
+- Проверяем healthcheck сервиса ui
+- Останавливаем сервис Post
+- Проверяем по Graph, что сервис ui деградировал, как и сервис ui_health_post_availability
+- Поднимаем, убеждаемся, что все сервисы работают корректно
+
+- Установка node_exporter. Добавляем в docker-compose файл
+```
+...
+services:
+
+  node-exporter:
+    image: prom/node-exporter:v0.15.2
+    user: root
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
+```
+- Добавляем job в конфиг prometheus
+```
+- job_name: 'node'
+ static_configs:
+ - targets:
+ - 'node-exporter:9100'
+ ```
+ - Собираем новый docker-image
+ ```
+ monitoring/prometheus $ docker build -t $USER_NAME/prometheus .
+ ```
+
+ ### Задание со * №1
+ - Добавить в Prometheus мониторинг MongoDB
+ - Используем percona exporter, используем последнюю актуальную версию 0.7.0
+ ```
+ https://github.com/percona/mongodb_exporter
+ ```
+ - Копируем Dockerfile из репозитория, создаем на его основе свой
+ - Делаем билд и пушим на docker-hub 
+ ```
+ cd monitoring/mongodb-exporter/
+ export USER_NAME=inks
+ docker build -t $USER_NAME/mongodb-exporter .
+ docker push $USER_NAME/mongodb-exporter
+ ```
+ - Добавляем запуск exporter в файл docker/docker-compose.yml
+ ```
+ mongodb-exporter:
+    image: ${USERNAME}/mongodb-exporter:latest
+    ports:
+      - '9216:9216'
+    command:
+      - '--collect.database'
+      - '--collect.collection'
+      - '--collect.indexusage'
+      - '--collect.topmetrics'
+      - '--mongodb.uri=mongodb://post_db:27017'
+    networks:
+      back_net:
+        aliases:
+          - mongodb-exporter
+ ```
+ - Добавляем job mongodb в файл prometheus.yml
+ ```
+ - job_name: 'mongodb'
+    static_configs:
+      - targets:
+        - 'mongodb-exporter:9216'
+ ```
+
+ - Пересобираем prometheus и пушим в репозиторий
+
+ ```
+ docker build -t $USER_NAME/prometheus .
+ docker push $USER_NAME/prometheus
+ ```
+
+ - Выключаем старое окружение, поднимаем новое
+ ```
+ docker-compose down
+ docker-compose up -d
+ ```
+ - Проверяем работоспособность
+
+### Задание со * №2 
+Добавить в проект мониторинг сервисов comment post ui с помощью blackbox или cloudprober экспортера
+Используем cloudprober https://github.com/google/cloudprober
+- Собираем контейнер через Dockerfile, настраиваем probe в cloudprober.cfg
+```
+docker-build -t $USER_NAME/cloudprober
+docker push $USER_NAME/cloudprober
+```
+- Добавляем job в prometheus.yml
+```
+- job_name: 'cloudprober'
+    static_configs:
+      - targets:
+        - 'cloudprober:9313'
+```
+- Добавляем описание контейнера в docker-compose, переподнимаем
+- Проверяем , открыв предварительно порт cloudprober 9313
+```
+http://ext_ip:9313/metrics
+```
+### Задание со * №3
+- Создаем Makefile, в котором описываем последовательность действий по созданию контейнеров и пушу в docker-hub

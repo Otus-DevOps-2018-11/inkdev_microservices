@@ -1,0 +1,11 @@
+---
+- name: Deploy reddit app
+  hosts: app
+  become: true
+  tasks:
+    - name: Run reddit docker
+      docker_container:
+        name: reddit
+        image: inks/otus-reddit:1.0
+        published_ports: 9292:9292
+  

@@ -1,0 +1,21 @@
+version: '3.3'
+services:
+  ui:
+   entrypoint:
+    - puma
+    - --debug
+    - -w 2
+   volumes:
+    - /home/docker-user/src/ui:/app
+
+  comment:
+   entrypoint:
+    - puma
+    - --debug
+    - -w 2
+   volumes:
+    - /home/docker-user/src/comment:/app
+    
+  post:
+   volumes:
+    - /home/docker-user/src/post-py:/app
