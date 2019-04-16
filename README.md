@@ -975,5 +975,6 @@ docker push $USER_NAME/cloudprober
 ```
 http://ext_ip:9313/metrics
 ```
+
 ### Задание со * №3
 - Создаем Makefile, в котором описываем последовательность действий по созданию контейнеров и пушу в docker-hub
