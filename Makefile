@@ -16,6 +16,9 @@ prometheus:
 cloudprober:
 	cd monitoring/cloudprober && docker build -t ${USER_NAME}/cloudprober .
 
+alertmanager:
+	cd monitoring/alertmanager && docker build -t ${USER_NAME}/alertmanager .
+
 push_post:
 	docker push ${USER_NAME}/post
 push_comment:
@@ -27,4 +30,6 @@ push_prometheus:
 	docker push ${USER_NAME}/prometheus
 push_cloudprober:
 	docker push ${USER_NAME}/cloudprober
+push_alertmanager:
+	docker push ${USER_NAME}/alertmanager
 

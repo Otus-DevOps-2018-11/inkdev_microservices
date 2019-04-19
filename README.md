@@ -978,3 +978,123 @@ http://ext_ip:9313/metrics
 
 ### Задание со * №3
 - Создаем Makefile, в котором описываем последовательность действий по созданию контейнеров и пушу в docker-hub
+
+
+### Домашнее задание №21(monitoring-2)
+Полезные команды
+```
+eval $(docker-machine env docker-host)
+docker-machine ip docker-host
+docker build -t $USER_NAME/prometheus .
+docker push $USER_NAME/prometheus
+```
+- Рефакторим код docker-compose.yml: мониторинг выносим в отдельный файл docker-compose-monitoring.yml
+Поднимать будем командами
+```
+docker-compose up -d
+docker-compose -f docker-compose-monitoring.yml up -d
+```
+- Добавляем cAdvisor в docker-compose-monitoring.yml
+- Добавляем Job в prometheus
+```
+ - job_name: 'cadvisor'
+    static_configs:
+      - targets:
+      - 'cadvisor:8080' 
+```
+- Пересобираем Prometheus, запускаем docker-compose
+```
+$ docker-compose up -d
+$ docker-compose -f docker-compose-monitoring.yml up -d 
+```
+- Поднимаем, убеждаемся в работе cadvisor, проверяем что метрики 'container' доступны
+
+Grafana
+- Добавляем новый сервис
+- Запускаем новый сервис
+```
+docker-compose -f docker-compose-monitoring.yml up -d grafana
+```
+- Заходим по внешнему адресу порт 3000, проверяем доступность, добавляем новый ресурс prometheus
+- Качаем с сайта Grafana json дашбоарда для мониторинга Docker, импортируем его в Grafana
+- Проверяем работу dashboard'а
+
+Сбор метрик приложения
+- Добавляем job для сбора информации о post сервисе
+- Пересобираем prometheus, переподнимаем окружение с мониторингом
+- Делаем несколько постов в приложении
+- В Grafana создаем dashboard с графиком ui_request_count. Сохраняем dashboard
+- Создаем второй график, показывающий количество неудачных http запросов с кодом ошибки 4xx и 5xx.  
+```
+Будем использовать
+функцию rate(), чтобы посмотреть не просто значение счетчика за
+весь период наблюдения, но и скорость увеличения данной
+величины за промежуток времени (возьмем, к примеру 1-минутный
+интервал, чтобы график был хорошо видим)
+rate(ui_request_count{http_status=~"^[45].*"}[1m])
+```
+- Делаем несколько запросов по адресу http://ext_ip:9292/nonexistent, проверяем, что график изменился
+- На первом графике делаем аналогичный rate 
+```
+rate(ui_request_count[1m])
+```
+- Использование гистограммы. Построили гистограмму с использованием 95 процентиля для метрики ui_request_response_time_bucket
+```
+histogram_quantile(0.95, sum(rate(ui_request_response_time_bucket[5m])) by (le))
+```
+- Сохранили и выгрузили дашбоард в файл UI_Service_Monitoring.json
+- Реализовали мониторинг бизнес-логики (счетчики количества постов и комментариев). Вынесли в отдельный dashboard и экспортировали в файл Business_Logic_Monitoring.json
+
+Алертинг
+- Используем alertmanager от prometheus
+- Создаем контейнер с включенной интеграцией со слак-каналом
+- Останавливаем сервис post, проверяем наличие сообщения
+
+- Пушим наши образы на dockerhub
+```
+$ docker login
+Login Succeeded
+$ docker push $USER_NAME/ui
+$ docker push $USER_NAME/comment
+$ docker push $USER_NAME/post
+$ docker push $USER_NAME/prometheus
+$ docker push $USER_NAME/alertmanager 
+```
+- Необходимые образы находятся по адресу https://hub.docker.com/u/inks/
+
+### Задание со *
+1. Изменение Makefile
+- Добавляем образы alertmanager в Makefile
+2. Выдача метрик в Prometheus средствами Docker
+- Добавляем сбор метрик Docker в Prometheus https://docs.docker.com/config/thirdparty/prometheus/
+ - На Dockerhost создаем файл в соответствии с документацией /etc/docker/daemon.json
+ ```
+ {
+  "metrics-addr" : "0.0.0.0:9323",
+  "experimental" : true
+ }
+ ```
+ - В prometheus добавляем job docker
+ ```
+ - job_name: 'docker'
+    static_configs:
+      - targets: 
+        - 'internal_docker_host_ip:9323'
+ ```
+ - Набор метрик стандартный, ориентирован на мониторинг сервиса docker и заметно скуднее, чем в cAdvisor, где помимо cpu, RAM есть подробные метрики мониторинга файловой системы, кол-ва полученных пакетов итд
+ - Для визуализации используем готовый дашбоард Docker Engine Metrics https://grafana.com/dashboards/1229
+
+3. Сбор метрик с помощью Telegraf от influxDB
+  - Конфигурируем telegraf с помощью файла https://github.com/influxdata/telegraf/blob/master/etc/telegraf.conf
+  - Заполняем секцию [[inputs.docker]]
+  - Собираем контейнер с telegraf
+  - Собираем дашбоард, выгружаем
+
+4. Создали алерт HTTPHighTimeResponse на 95 процентиль времени ответа HTTP, проверили отправку алерта с заниженным порогом срабатывания
+5. Настроили оповещение на электронную почту, для этого поменяли конфиг в alertmanager. Проверили приходящие алерты
+
+
+
+
+
+

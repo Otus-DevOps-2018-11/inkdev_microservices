@@ -1,0 +1,23 @@
+global:
+  slack_api_url: 'https://hooks.slack.com/services/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'
+
+route:
+  receiver: 'slack-notifications'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'email-notifications'
+
+receivers:
+- name: 'slack-notifications'
+  slack_configs:
+  - channel: '#alexey_bogdanov'
+
+- name: 'email-notifications'
+  email_configs:
+    - to: 'admin@domain.com'
+      send_resolved: true
+      from: 'alert@domain.com'
+      smarthost: 'smtp.domain.com:587'
+      auth_username: 'admin@domain.com'
+      auth_password: 'secretpassword'
