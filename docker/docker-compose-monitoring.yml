@@ -99,6 +99,16 @@ services:
          front_net:
          back_net:
 
+  telegraf:
+    image: ${USERNAME}/telegraf:latest
+    ports:
+      - 9273:9273
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      back_net:
+      front_net:
+
 volumes:
   prometheus_data:
   grafana_data:

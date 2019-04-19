@@ -1062,6 +1062,37 @@ $ docker push $USER_NAME/alertmanager
 ```
 - Необходимые образы находятся по адресу https://hub.docker.com/u/inks/
 
+### Задание со *
+1. Изменение Makefile
+- Добавляем образы alertmanager в Makefile
+2. Выдача метрик в Prometheus средствами Docker
+- Добавляем сбор метрик Docker в Prometheus https://docs.docker.com/config/thirdparty/prometheus/
+ - На Dockerhost создаем файл в соответствии с документацией /etc/docker/daemon.json
+ ```
+ {
+  "metrics-addr" : "0.0.0.0:9323",
+  "experimental" : true
+ }
+ ```
+ - В prometheus добавляем job docker
+ ```
+ - job_name: 'docker'
+    static_configs:
+      - targets: 
+        - 'internal_docker_host_ip:9323'
+ ```
+ - Набор метрик стандартный, ориентирован на мониторинг сервиса docker и заметно скуднее, чем в cAdvisor, где помимо cpu, RAM есть подробные метрики мониторинга файловой системы, кол-ва полученных пакетов итд
+ - Для визуализации используем готовый дашбоард Docker Engine Metrics https://grafana.com/dashboards/1229
+
+3. Сбор метрик с помощью Telegraf от influxDB
+  - Конфигурируем telegraf с помощью файла https://github.com/influxdata/telegraf/blob/master/etc/telegraf.conf
+  - Заполняем секцию [[inputs.docker]]
+  - Собираем контейнер с telegraf
+  - Собираем дашбоард, выгружаем
+
+4. Создали алерт HTTPHighTimeResponse на 95 процентиль времени ответа HTTP, проверили отправку алерта с заниженным порогом срабатывания
+5. Настроили оповещение на электронную почту, для этого поменяли конфиг в alertmanager. Проверили приходящие алерты
+
 
 
 
