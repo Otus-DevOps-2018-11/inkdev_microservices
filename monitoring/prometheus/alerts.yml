@@ -10,3 +10,11 @@ groups:
         description: '{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute'
         summary: 'Instance {{ $labels.instance }} down'
 
+    - alert: HTTPHighTimeResponse
+      expr: histogram_quantile(0.95, sum(rate(ui_request_response_time_bucket[5m])) by (le)) > 1
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: High response time on HTTP requests for 1 minute
+
