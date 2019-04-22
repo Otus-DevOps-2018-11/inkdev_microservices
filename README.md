@@ -1094,6 +1094,65 @@ $ docker push $USER_NAME/alertmanager
 5. Настроили оповещение на электронную почту, для этого поменяли конфиг в alertmanager. Проверили приходящие алерты
 
 
+### Домашнее задание №23(logging-1)
+- Создаем хост logging
+- Пересобираем образы в каталоге src
+- Поднимаем окружение
+- Собираем контейнер для fluentd
+```
+Из директории logging/fluentd
+docker build -t $USER_NAME/fluentd .
+```
+
+Структурированные логи
+- Подключаем драйвер для отправки логов во fluentd. Используем docker-драйвер
+- Создаем несколько постов
+- Переходим в интерфейс kibana
+
+```
+docker-machine ssh logging
+sudo sysctl -w vm.max_map_count=262144
+```
+
+Неструктурированные логи
+- Для парсинга неструктурированных логов сервиса ui будем использовать регулярные выражения
+```
+<filter service.ui>
+  @type parser
+  format /\[(?<time>[^\]]*)\]  (?<level>\S+) (?<user>\S+)[\W]*service=(?<service>\S+)[\W]*event=(?<event>\S+)[\W]*(?:path=(?<path>\S+)[\W]*)?request_id=(?<request_id>\S+)[\W]*(?:remote_addr=(?<remote_addr>\S+)[\W]*)?(?:method= (?<method>\S+)[\W]*)?(?:response_status=(?<response_status>\S+)[\W]*)?(?:message='(?<message>[^\']*)[\W]*)?/
+  key_name log
+</filter>
+```
+- Проверяем работу парсера
+- Используем grok-шаблон
+
+### Задание со *
+- Создадим фильтр для парсинга логов ui таким образом, чтобы разбирались два формата представления. Конфигурацию разделим с помощью тегов <grok></grok>
+```
+<grok>
+    pattern service=%{WORD:service} \| event=%{WORD:event} \| request_id=%{GREEDYDATA:request_id} \| message='%{GREEDYDATA:message}'
+  </grok>
+  <grok>
+    pattern service=%{WORD:service} \| event=%{WORD:event} \| path=%{PATH:path} \| request_id=%{GREEDYDATA:request_id} \| remote_addr=%{IP:remote_addr} \| method= %{WORD:method} \| response_status=%{NUMBER:response_status}
+  </grok>
+```
+
+### Задание с ***
+Используем систему распределенного трейсинга Zipkin
+- Собираем проблемное приложение, убеждаемся, что ответ при нажатии довольно медленный.
+- По трейсингу Zipkin видим, что запрос post.get занимает 3.019 сек. 
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

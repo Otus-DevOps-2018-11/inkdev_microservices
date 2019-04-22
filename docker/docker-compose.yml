@@ -16,11 +16,31 @@ services:
         published: ${EXTERNAL_PORT}
         protocol: tcp
         mode: host
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.ui
+    environment:  
+      - ZIPKIN_ENABLED=${ZIPKIN_ENABLED}
     networks:    
       - front_net
 
   post:
     image: ${USERNAME}/post:${POST_VERSION}
+    environment:
+      - POST_DATABASE_HOST=post_db
+      - POST_DATABASE=posts
+      - ZIPKIN_ENABLED=${ZIPKIN_ENABLED}
+    depends_on:
+      - post_db
+    ports:
+      - "5000:5000"
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.post
     networks:
       front_net:
         aliases:
@@ -31,6 +51,8 @@ services:
 
   comment:
     image: ${USERNAME}/comment:${COMMENT_VERSION}
+    environment:  
+      - ZIPKIN_ENABLED=${ZIPKIN_ENABLED}
     networks:
       front_net:
         aliases:
