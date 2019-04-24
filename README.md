@@ -1142,18 +1142,502 @@ sudo sysctl -w vm.max_map_count=262144
 - Собираем проблемное приложение, убеждаемся, что ответ при нажатии довольно медленный.
 - По трейсингу Zipkin видим, что запрос post.get занимает 3.019 сек. 
 
+### Домашнее задание №25(kubernetes-1)
+
+The Hard way
+Полезные команды
+```
+#Tmux
+tmux-зайти в режим
+ctrl b c создать окно
+ctrl b x удалить окно/pane
+ctrl b " горизонтальный pane
+ctrl b % вертикальный pane
+ctrl b shift : режим ввода команд
+ctrl b shift : set syncronize-panes on включить синхронизацию между panes
+ctrl b shift : set syncronize-panes off выключить синхронизацию между panes
+ctrl b arrow up, arrow down перемещение между горизонтальными окнами
+exit
+```
+1. Prerequisites
+Проверяем дефолт регион и зону, выставляем Европу
+```
+gcloud config set compute/region europe-west1
+Updated property [compute/region]
+gcloud config set compute/zone europe-west1-b
+Updated property [compute/zone]
+```
+2. Installing the Client Tools
+Инсталлируем cfssl и cfssljson, проверяем
+```
+cfssl version
+Version: 1.2.0
+Revision: dev
+Runtime: go1.6
+```
+Инсталлируем kubectl
+```
+kubectl version --client
+Client Version: version.Info{Major:"1", Minor:"12", GitVersion:"v1.12.0", GitCommit:"0ed33881dc4355495f623c6f22e7dd0b7632b7c0", GitTreeState:"clean", BuildDate:"2018-09-27T17:05:32Z", GoVersion:"go1.10.4", Compiler:"gc", Platform:"linux/amd64"}
+```
+
+3. Provisioning Compute Resources
+Создаем подсети, назначаем адресацию
+```
+gcloud compute networks create kubernetes-the-hard-way --subnet-mode custom
+
+NAME                     SUBNET_MODE  BGP_ROUTING_MODE  IPV4_RANGE  GATEWAY_IPV4
+kubernetes-the-hard-way  CUSTOM       REGIONAL
+
+Instances on this network will not be reachable until firewall rules
+are created. As an example, you can allow all internal traffic between
+instances as well as SSH, RDP, and ICMP by running:
+
+$ gcloud compute firewall-rules create <FIREWALL_NAME> --network kubernetes-the-hard-way --allow tcp,udp,icmp --source-ranges <IP_RANGE>
+$ gcloud compute firewall-rules create <FIREWALL_NAME> --network kubernetes-the-hard-way --allow tcp:22,tcp:3389,icmp
+
+alexis@inkdev:~/kubectl$ gcloud compute networks subnets create kubernetes \
+>   --network kubernetes-the-hard-way \
+>   --range 10.240.0.0/24
+
+NAME        REGION        NETWORK                  RANGE
+kubernetes  europe-west1  kubernetes-the-hard-way  10.240.0.0/24
+```
+Создаем основные правила фаерволла для доступа изнутри
+```
+gcloud compute firewall-rules create kubernetes-the-hard-way-allow-internal \
+  --allow tcp,udp,icmp \
+  --network kubernetes-the-hard-way \
+  --source-ranges 10.240.0.0/24,10.200.0.0/16
+```
+Открываем доступ по ssh, icmp, https снаружи
+```
+gcloud compute firewall-rules create kubernetes-the-hard-way-allow-external \
+  --allow tcp:22,tcp:6443,icmp \
+  --network kubernetes-the-hard-way \
+  --source-ranges 0.0.0.0/0
+```
+Проверяем
+```
+gcloud compute firewall-rules list --filter="network:kubernetes-the-hard-way"
+NAME                                    NETWORK                  DIRECTION  PRIORITY  ALLOW                 DENY  DISABLED
+kubernetes-the-hard-way-allow-external  kubernetes-the-hard-way  INGRESS    1000      tcp:22,tcp:6443,icmp        False
+kubernetes-the-hard-way-allow-internal  kubernetes-the-hard-way  INGRESS    1000      tcp,udp,icmp                False
+```
+Назначаем внешний Ip-адрес, проверяем
+```
+gcloud compute addresses list --filter="name=('kubernetes-the-hard-way')"
+```
+Контроллеры
+Создаем три инстанса, которые держат на себе control-plane
+Создаем три инстанса с воркерами
+Проверяем
+```
+gcloud compute instances list
+NAME          ZONE            MACHINE_TYPE   PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP     STATUS
+controller-0  europe-west1-b  n1-standard-1               10.240.0.10                 RUNNING
+controller-1  europe-west1-b  n1-standard-1               10.240.0.11                 RUNNING
+controller-2  europe-west1-b  n1-standard-1               10.240.0.12                 RUNNING
+worker-0      europe-west1-b  n1-standard-1               10.240.0.20                 RUNNING
+worker-1      europe-west1-b  n1-standard-1               10.240.0.21                 RUNNING
+worker-2      europe-west1-b  n1-standard-1               10.240.0.22                 RUNNING
+```
+Проверяем доступ по ssh
+```
+gcloud compute ssh controller-0
+alexis@controller-0:~$
+```
+
+4. Provisioning a CA and Generating TLS Certificates
+Генерируем configuration file, certificate, и private key:
+```
+ls
+ca-config.json  ca.csr  ca-csr.json  ca-key.pem  ca.pem
+```
+Генерируем сертификат администратора
+```
+ls
+admin.csr  admin-csr.json  admin-key.pem  admin.pem 
+```
+Генерируем клиентские сертификаты kubelet
+```
+ls -al
+ worker-0.csr
+ worker-0-csr.json
+ worker-0-key.pem
+ worker-0.pem
+ worker-1.csr
+ worker-1-csr.json
+ worker-1-key.pem
+ worker-1.pem
+ worker-2.csr
+ worker-2-csr.json
+ worker-2-key.pem
+ worker-2.pem
+```
+Генерируем сертификаты kube-controller-manager
+```
+kube-controller-manager.csr
+kube-controller-manager-csr.json
+kube-controller-manager-key.pem
+kube-controller-manager.pem
+```
+Генерируем сертификаты kube-proxy
+```
+ ls -al | grep kube-proxy
+kube-proxy.csr
+kube-proxy-csr.json
+kube-proxy-key.pem
+kube-proxy.pem
+```
+Генерируем сертификаты kube-scheduler
+```
+kube-scheduler.csr
+kube-scheduler-csr.json
+kube-scheduler-key.pem
+kube-scheduler.pem
+```
+Генерируем kubernetes API certificate
+```
+ls -al | grep kubernetes
+kubernetes.csr
+kubernetes-csr.json
+kubernetes-key.pem
+kubernetes.pem
+```
+Генерируем service-accout cert
+```
+ls -l | grep service-account
+service-account.csr
+service-account-csr.json
+service-account-key.pem
+service-account.pem
+```
+Распростроняем сертификаты на соответсвующие инстансы и воркеры
+
+5. Generating Kubernetes Configuration Files for Authentication
+Генерируем kubelet conf file
+```
+Cluster "kubernetes-the-hard-way" set.
+User "system:node:worker-0" set.
+Context "default" created.
+Switched to context "default".
+Cluster "kubernetes-the-hard-way" set.
+User "system:node:worker-1" set.
+Context "default" created.
+Switched to context "default".
+Cluster "kubernetes-the-hard-way" set.
+User "system:node:worker-2" set.
+Context "default" created.
+Switched to context "default".
+
+```
+Генерируем kube-proxy Kubernetes Configuration File
+```
+Cluster "kubernetes-the-hard-way" set.
+User "system:kube-proxy" set.
+Context "default" created.
+Switched to context "default".
+```
+Генерируем conroller-manager
+```
+Cluster "kubernetes-the-hard-way" set.
+User "system:kube-controller-manager" set.
+Context "default" created.
+Switched to context "default".
+```
+Генерируем kube-scheduler
+```
+Cluster "kubernetes-the-hard-way" set.
+User "system:kube-scheduler" set.
+Context "default" created.
+Switched to context "default".
+```
+Генерируем kubeconfig для админа
+```
+Cluster "kubernetes-the-hard-way" set.
+User "admin" set.
+Context "default" created.
+Switched to context "default".
+
+```
+Распространяем kubelet и kube-proxy kubeconfig files на каждый из экземпляров воркера
+
+6. Generating the Data Encryption Config and Key
+Генерируем ключ шифрования и шифруем секреты кубера
+
+7. Bootstrapping the etcd Cluster
+Заходим с помощью tmux параллельно на три контроллера 
+Устанавливаем  конфигурируем и запускаем etcd server
+```
+3a57933972cb5131, started, controller-2, https://10.240.0.12:2380, https://10.240.0.12:2379
+f98dc20bce6225a0, started, controller-0, https://10.240.0.10:2380, https://10.240.0.10:2379
+ffed16798470cab5, started, controller-1, https://10.240.0.11:2380, https://10.240.0.11:2379
+
+```
+
+8. Bootstrapping the Kubernetes Control Plane
+```
+kubectl get componentstatuses --kubeconfig admin.kubeconfig
+NAME                 STATUS    MESSAGE             ERROR
+controller-manager   Healthy   ok
+scheduler            Healthy   ok
+etcd-2               Healthy   {"health":"true"}
+etcd-1               Healthy   {"health":"true"}
+etcd-0               Healthy   {"health":"true"}
+```
+
+Test nginx HTTP health check proxy
+```
+curl -H "Host: kubernetes.default.svc.cluster.local" -i http://127.0.0.1/healthz
+HTTP/1.1 200 OK
+Server: nginx/1.14.0 (Ubuntu)
+Date: Tue, 23 Apr 2019 08:30:14 GMT
+Content-Type: text/plain; charset=utf-8
+Content-Length: 2
+Connection: keep-alive
+
+ok
+```
+Kubernetes frontend load balancer
+```
+{
+  "major": "1",
+  "minor": "12",
+  "gitVersion": "v1.12.0",
+  "gitCommit": "0ed33881dc4355495f623c6f22e7dd0b7632b7c0",
+  "gitTreeState": "clean",
+  "buildDate": "2018-09-27T16:55:41Z",
+  "goVersion": "go1.10.4",
+  "compiler": "gc",
+  "platform": "linux/amd64"
+}
+```
+
+9. Bootstrapping the Kubernetes Worker Nodes
+
+Проверка
+```
+gcloud compute ssh controller-0 \
+>   --command "kubectl get nodes --kubeconfig admin.kubeconfig"
+NAME       STATUS   ROLES    AGE   VERSION
+worker-0   Ready    <none>   86s   v1.12.0
+worker-1   Ready    <none>   85s   v1.12.0
+worker-2   Ready    <none>   86s   v1.12.0
+```
+
+10. Configuring kubectl for Remote Access
+```
+kubectl get componentstatuses
+NAME                 STATUS    MESSAGE             ERROR
+controller-manager   Healthy   ok
+scheduler            Healthy   ok
+etcd-0               Healthy   {"health":"true"}
+etcd-1               Healthy   {"health":"true"}
+etcd-2               Healthy   {"health":"true"}
+
+ kubectl get nodes
+NAME       STATUS   ROLES    AGE    VERSION
+worker-0   Ready    <none>   8m6s   v1.12.0
+worker-1   Ready    <none>   8m5s   v1.12.0
+worker-2   Ready    <none>   8m6s   v1.12.0
+
+```
+
+11. Provisioning Pod Network Routes
+```
+for instance in worker-0 worker-1 worker-2; do
+>   gcloud compute instances describe ${instance} \
+>     --format 'value[separator=" "](networkInterfaces[0].networkIP,metadata.items[0].value)'
+> done
+10.240.0.20 10.200.0.0/24
+10.240.0.21 10.200.1.0/24
+10.240.0.22 10.200.2.0/24
+
+```
+
+```
+NAME                            NETWORK                  DEST_RANGE     NEXT_HOP                  PRIORITY
+default-route-1afeb1fda6959d8f  kubernetes-the-hard-way  0.0.0.0/0      default-internet-gateway  1000
+default-route-e1a84a5413e4626d  kubernetes-the-hard-way  10.240.0.0/24  kubernetes-the-hard-way   1000
+kubernetes-route-10-200-0-0-24  kubernetes-the-hard-way  10.200.0.0/24  10.240.0.20               1000
+kubernetes-route-10-200-1-0-24  kubernetes-the-hard-way  10.200.1.0/24  10.240.0.21               1000
+kubernetes-route-10-200-2-0-24  kubernetes-the-hard-way  10.200.2.0/24  10.240.0.22               1000
+
+```
+
+12. Deploying the DNS Cluster Add-on
+```
+ kubectl get pods -l k8s-app=kube-dns -n kube-system
+NAME                       READY   STATUS    RESTARTS   AGE
+coredns-699f8ddd77-plwws   1/1     Running   0          39s
+coredns-699f8ddd77-wc64p   1/1     Running   0          39s
+
+kubectl get pods -l run=busybox
+NAME                      READY   STATUS    RESTARTS   AGE
+busybox-bd8fb7cbd-f6wnx   1/1     Running   0          28s
 
 
+kubectl exec -ti $POD_NAME -- nslookup kubernetes
+Server:    10.32.0.10
+Address 1: 10.32.0.10 kube-dns.kube-system.svc.cluster.local
+
+Name:      kubernetes
+Address 1: 10.32.0.1 kubernetes.default.svc.cluster.local
+
+```
+
+13. Smoke test
+Data encryption check
+```
+gcloud compute ssh controller-0 \
+>   --command "sudo ETCDCTL_API=3 etcdctl get \
+>   --endpoints=https://127.0.0.1:2379 \
+>   --cacert=/etc/etcd/ca.pem \
+>   --cert=/etc/etcd/kubernetes.pem \
+>   --key=/etc/etcd/kubernetes-key.pem\
+>   /registry/secrets/default/kubernetes-the-hard-way | hexdump -C"
+00000000  2f 72 65 67 69 73 74 72  79 2f 73 65 63 72 65 74  |/registry/secret|
+00000010  73 2f 64 65 66 61 75 6c  74 2f 6b 75 62 65 72 6e  |s/default/kubern|
+00000020  65 74 65 73 2d 74 68 65  2d 68 61 72 64 2d 77 61  |etes-the-hard-wa|
+00000030  79 0a 6b 38 73 3a 65 6e  63 3a 61 65 73 63 62 63  |y.k8s:enc:aescbc|
+00000040  3a 76 31 3a 6b 65 79 31  3a 4d e3 0f 28 63 bc d6  |:v1:key1:M..(c..|
+00000050  4f a5 2a 4f 0e f3 08 cd  fb 11 c9 ea 62 a4 81 2c  |O.*O........b..,|
+00000060  8e 82 b4 f5 64 fc 2a 6a  87 df df 3e 9e f4 af 01  |....d.*j...>....|
+00000070  59 31 9b 2a 60 c6 70 70  04 27 b7 f8 91 04 de c8  |Y1.*`.pp.'......|
+00000080  14 07 20 fd af a5 20 b4  4b f5 03 f3 be ad 1b 0b  |.. ... .K.......|
+00000090  20 4e c9 10 ee 72 9d 9a  6c 27 a5 dc 0d e4 3d 74  | N...r..l'....=t|
+000000a0  95 3c 79 56 b9 08 91 28  2b 81 bb 26 95 d9 8d 4c  |.<yV...(+..&...L|
+000000b0  d7 ee 10 03 8d 51 60 7b  24 c4 5e ec 7a cd e6 4e  |.....Q`{$.^.z..N|
+000000c0  9d 67 de e4 a2 e2 0c 40  8f 65 b1 50 eb 21 e2 07  |.g.....@.e.P.!..|
+000000d0  ad c3 f8 19 44 e3 ac 6f  db 09 42 48 93 b1 1e 75  |....D..o..BH...u|
+000000e0  e3 be 67 06 48 8e 4b d8  fb 0a                    |..g.H.K...|
+000000ea
+
+```
+
+Deployments check
+```
+kubectl get pods -l run=nginx
+NAME                    READY   STATUS    RESTARTS   AGE
+nginx-dbddb74b8-4pm45   1/1     Running   0          32s
+
+```
+
+Check port forwarding
+```
+curl --head http://127.0.0.1:8080
+HTTP/1.1 200 OK
+Server: nginx/1.15.12
+Date: Tue, 23 Apr 2019 20:07:42 GMT
+Content-Type: text/html
+Content-Length: 612
+Last-Modified: Tue, 16 Apr 2019 13:08:19 GMT
+Connection: keep-alive
+ETag: "5cb5d3c3-264"
+Accept-Ranges: bytes
+
+```
+
+Logs check
+```
+kubectl logs $POD_NAME
+127.0.0.1 - - [23/Apr/2019:20:07:42 +0000] "HEAD / HTTP/1.1" 200 0 "-" "curl/7.52.1" "-"
+```
+
+Execute command in container check
+```
+ kubectl exec -ti $POD_NAME -- nginx -v
+nginx version: nginx/1.15.12
+
+```
+Services check
+```
+kubectl expose deployment nginx --port 80 --type NodePort
+
+curl -I http://${EXTERNAL_IP}:${NODE_PORT}
+HTTP/1.1 200 OK
+Server: nginx/1.15.12
+Date: Tue, 23 Apr 2019 20:12:30 GMT
+Content-Type: text/html
+Content-Length: 612
+Last-Modified: Tue, 16 Apr 2019 13:08:19 GMT
+Connection: keep-alive
+ETag: "5cb5d3c3-264"
+Accept-Ranges: bytes
+
+```
+
+Untrusted workloads check
+```
+ sudo runsc --root /run/containerd/runsc/k8s.io ps ${CONTAINER_ID}
+I0423 20:15:03.902068   29057 x:0] ***************************
+I0423 20:15:03.902228   29057 x:0] Args: [runsc --root /run/containerd/runsc/k8s.io ps 413f15e735b8b8c11bffd421436423514dab787009fca1729acf1b33944bef54]
+I0423 20:15:03.902311   29057 x:0] Git Revision: 50c283b9f56bb7200938d9e207355f05f79f0d17
+I0423 20:15:03.902383   29057 x:0] PID: 29057
+I0423 20:15:03.902454   29057 x:0] UID: 0, GID: 0
+I0423 20:15:03.902523   29057 x:0] Configuration:
+I0423 20:15:03.902580   29057 x:0]              RootDir: /run/containerd/runsc/k8s.io
+I0423 20:15:03.902721   29057 x:0]              Platform: ptrace
+I0423 20:15:03.902858   29057 x:0]              FileAccess: exclusive, overlay: false
+I0423 20:15:03.902990   29057 x:0]              Network: sandbox, logging: false
+I0423 20:15:03.903124   29057 x:0]              Strace: false, max size: 1024, syscalls: []
+I0423 20:15:03.903266   29057 x:0] ***************************
+UID       PID       PPID      C         STIME     TIME      CMD
+0         1         0         0         20:13     10ms      app
+I0423 20:15:03.904642   29057 x:0] Exiting with status: 0
+
+```
+
+Добавляем deployments (ui, post, mongo, comment) и проверяем запуск подов
+
+```
+kubectl apply -f ui-deployment.yml
+deployment.apps/ui-deployment created
+alexis@inkdev:~/inkdev_microservices/kubernetes/reddit$ kubectl apply -f post-deployment.yml
+deployment.apps/post-deployment created
+alexis@inkdev:~/inkdev_microservices/kubernetes/reddit$ kubectl apply -f mongo-deployment.yml
+deployment.apps/mongo-deployment created
+alexis@inkdev:~/inkdev_microservices/kubernetes/reddit$ kubectl apply -f comment-deployment.yml
+deployment.apps/comment-deployment created
+alexis@inkdev:~/inkdev_microservices/kubernetes/reddit$ kubectl get pods -o wide
+NAME                                 READY   STATUS    RESTARTS   AGE   IP           NODE       NOMINATED NODE
+busybox-bd8fb7cbd-f6wnx              1/1     Running   13         13h   10.200.0.2   worker-0   <none>
+comment-deployment-687ddff64-2kh56   1/1     Running   0          10s   10.200.0.4   worker-0   <none>
+mongo-deployment-6895dffdf4-w7znw    1/1     Running   0          39s   10.200.1.4   worker-1   <none>
+nginx-dbddb74b8-4pm45                1/1     Running   0          13h   10.200.0.3   worker-0   <none>
+post-deployment-84cc8f5c88-tmq95     1/1     Running   0          45s   10.200.2.4   worker-2   <none>
+ui-deployment-69974fdf6-kpwg4        1/1     Running   0          66s   10.200.1.3   worker-1   <none>
+untrusted                            1/1     Running   0          12h   10.200.2.3   worker-2   <none>
+```
+Все созданные в процессе прохождения the hard way файлы, кроме бинарных,  перенесены в папку the_hard_way
+
+14. Удаляем ресурсы
+
+### Задание с *
+
+Описать установку компонентов Kubernetes из THW в виде Ansible-плейбука в папке kubernetes/ansible
+- Создали несколько блоков плейбука, отвечающих за создание сети, правил внешнего и внутреннего фаерволла, убедились в корректной работе
+Для работы с GCP использовали модуль ansible gce
+```
+ansible-playbook playbooks/compute_resources.yml
 
 
+PLAY [Provision networks & firewall] *********************************************************************************************************************************
 
+TASK [Virtual Private Cloud Network] *********************************************************************************************************************************
+ok: [localhost]
 
+TASK [Firewall external] *********************************************************************************************************************************************
+ok: [localhost]
 
+TASK [Firewall internal] *********************************************************************************************************************************************
+ok: [localhost]
 
+TASK [external_ip] ***************************************************************************************************************************************************
+ok: [localhost]
 
+PLAY RECAP ***********************************************************************************************************************************************************
+localhost                  : ok=4    changed=0    unreachable=0    failed=0
 
-
-
-
-
-
+```

@@ -1,0 +1,38 @@
+---
+- name: Provision networks & firewall
+  hosts: localhost
+  gather_facts: no
+  connection: local
+  vars:
+    project: infra-226512
+    region: europe-west1
+    zone: europe-west1-b
+    inst_count: 3
+  tasks:
+
+    - name: Virtual Private Cloud Network
+      gce_net:
+          name: kubernetes-the-hard-way
+          mode: custom
+          subnet_name: kubernetes
+          subnet_region: "{{ region }}"
+          ipv4_range: 10.240.0.0/24
+
+    - name: Firewall external
+      gce_net:
+        name: kubernetes-the-hard-way
+        fwname: kubernetes-the-hard-way-allow-external
+        allowed: tcp;udp;icmp
+        src_range: [ '10.240.0.0/24', '10.200.0.0/16' ]
+
+    - name: Firewall internal
+      gce_net:
+        name: kubernetes-the-hard-way
+        fwname: kubernetes-the-hard-way-allow-internal
+        allowed: tcp:22;tcp:6443;icmp
+        src_range: [ '0.0.0.0/0' ]
+
+    - name: external_ip
+      gce_eip:
+        name: kubernetes-the-hard-way
+        region: "{{ region }}"
