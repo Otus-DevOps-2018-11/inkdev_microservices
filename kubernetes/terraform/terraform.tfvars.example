@@ -1,0 +1,5 @@
+project = "docker-docker"
+public_key_path = "~/.ssh/appuser.pub"
+private_key_path = "~/.ssh/appuser"
+region = "region-1"
+zone = "region-1-b"

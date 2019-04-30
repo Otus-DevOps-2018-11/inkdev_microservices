@@ -1829,6 +1829,15 @@ kubectl create clusterrolebinding kubernetes-dashboard  --clusterrole=cluster-ad
 clusterrolebinding.rbac.authorization.k8s.io/kubernetes-dashboard created
 ```
 
+### Задание с *
+- Разворачиваем кластер с помощью Terraform. Необходимые файлы поместили в каталог kubernetes/terraform. Для развертывания приложения используем скрипт deploy.sh
+Создали и проверили развертывание
+```
+terraform init
+terraform init
+terraform init
+```
+- Создали манифест dashboard-kubernetes.yml для включения дашбоарда kubernetes
 
 
 
