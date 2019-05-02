@@ -1641,3 +1641,205 @@ PLAY RECAP *********************************************************************
 localhost                  : ok=4    changed=0    unreachable=0    failed=0
 
 ```
+
+### Домашнее задание №26(kubernetes-2)
+
+Полезные команды
+```
+kubectl config current-context #Текущий контекст
+minikube
+
+kubectl config get-contexts #Список всех контекстов
+CURRENT   NAME       CLUSTER    AUTHINFO   NAMESPACE
+*         minikube   minikube   minikube
+#Отладка
+kubectl get pods -o wide --all-namespaces
+
+```
+
+- Устанавливаем VirtualBox
+- Устанавливаем последнюю версию minikube. https://kubernetes.io/docs/tasks/tools/install-minikube/#cleanup-everything-to-start-fresh
+```
+minikube start
+o   minikube v1.0.0 on linux (amd64)
+$   Downloading Kubernetes v1.14.0 images in the background ...
+>   Creating virtualbox VM (CPUs=2, Memory=2048MB, Disk=20000MB) ...
+@   Downloading Minikube ISO ...
+
+ 142.88 MB / 142.88 MB [============================================] 100.00% 0s
+-   "minikube" IP address is 192.168.99.107
+-   Configuring Docker as the container runtime ...
+-   Version of container runtime is 18.06.2-ce
+:   Waiting for image downloads to complete ...
+-   Preparing Kubernetes environment ...
+@   Downloading kubelet v1.14.0
+@   Downloading kubeadm v1.14.0
+-   Pulling images required by Kubernetes v1.14.0 ...
+-   Launching Kubernetes v1.14.0 using kubeadm ...
+:   Waiting for pods: apiserver proxy etcd scheduler controller dns
+-   Configuring cluster permissions ...
+-   Verifying component health .....
++   kubectl is now configured to use "minikube"
+=   Done! Thank you for using minikube!
+
+``` 
+- Проверяем запуск
+```
+kubectl get nodes
+NAME       STATUS   ROLES    AGE     VERSION
+minikube   Ready    master   7m50s   v1.14.0
+
+```
+- Проверяем текущий контекст 
+```
+ kubectl config current-context
+```
+
+- Список всех контекстов
+```
+ kubectl config get-contexts
+CURRENT   NAME       CLUSTER    AUTHINFO   NAMESPACE
+*         minikube   minikube   minikube
+```
+
+- Деплоим наше приложение
+
+- Запускаем создание ui-компоненты на основе манифеста ui-deployment. Пробрасываем порты из Podа. Проверяем доступность приложения по адресу localhost:8080 
+```
+kubectl apply -f ui-deployment.yml
+deployment.apps/ui created
+kubectl get deployment
+NAME   READY   UP-TO-DATE   AVAILABLE   AGE
+ui     3/3     3            3           77s
+alexis@vagrant:~/kubernetes/reddit$ kubectl get pods --selector component=ui
+NAME                  READY   STATUS    RESTARTS   AGE
+ui-694844975f-4cgvw   1/1     Running   0          3m18s
+ui-694844975f-qlsvb   1/1     Running   0          3m18s
+ui-694844975f-xhx27   1/1     Running   0          3m18s
+alexis@vagrant:~/kubernetes/reddit$ kubectl port-forward <pod-name> 8080:9292
+-bash: pod-name: Нет такого файла или каталога
+alexis@vagrant:~/kubernetes/reddit$ kubectl port-forward ui-694844975f-4cgvw 8080:9292
+Forwarding from 127.0.0.1:8080 -> 9292
+Forwarding from [::1]:8080 -> 9292
+
+Handling connection for 8080
+```
+- Запускаем создание comment-компоненты на основе манифеста comment-deployment. Пробрасываем порты из Podа. Проверяем доступность приложения по адресу localhost:8080/healthcheck
+```
+kubectl apply -f comment-deployment.yml
+deployment.apps/comment created
+a
+alexis@vagrant:~/kubernetes/reddit$ kubectl get pods --selector component=comment
+NAME                       READY   STATUS    RESTARTS   AGE
+comment-6f9644bc85-q26w2   1/1     Running   0          41s
+comment-6f9644bc85-q4cws   1/1     Running   0          41s
+comment-6f9644bc85-t6twq   1/1     Running   0          41s
+alexis@vagrant:~/kubernetes/reddit$ kubectl port-forward comment-6f9644bc85-q26w2 8080:9292
+Forwarding from 127.0.0.1:8080 -> 9292
+Forwarding from [::1]:8080 -> 9292
+Handling connection for 8080
+Handling connection for 8080
+Handling connection for 8080
+
+```
+- Поднимаем mongo
+- Для взаимодействия ui с comment поднимаем comment-service и post-service.yml
+```
+kubectl describe service comment | grep Endpoints
+Endpoints:         172.17.0.11:9292,172.17.0.4:9292,172.17.0.6:9292
+
+kubectl exec -ti ui-694844975f-8gcsd nslookup comment
+nslookup: can't resolve '(null)': Name does not resolve
+
+Name:      comment
+Address 1: 10.110.40.234 comment.default.svc.cluster.local
+
+```
+- Поднимаем сервис для Mongo mongodb-service.yml
+- Создаем сервисы для взаимодействия компонентов приложения:
+ - comment-mongodb-service.yml и post-mongodb-service.yml
+ - mongo-deployment.yml
+ - Добавляем env в comment-deployment.yml и post-deployment.yml
+ - обеспечиваем доступ к приложению снаружи ui-service.yml, пробрасываем на порт 32092
+ NodePort - для доступа снаружи кластера
+ port - для доступа к сервису изнутри кластера
+Minikube может выдавать web-странцы с сервисами которые были помечены типом NodePort
+```
+minikube service ui #перебросит на страницу в браузере
+minikube service list 
+```
+Просмотр расширений
+```
+minikube addons list
+minikube addons enable dashboard
+-   dashboard was successfully enabled
+
+```
+
+## Работа с namespaces
+- Создаем namespace dev
+```
+kubectl apply -f dev-namespace.yml
+```
+- Запускаем приложение в dev-namespace
+```
+kubectl apply -n dev -f
+```
+- Добавляем информацию об окружении внутрь контейнера Ui и проверяем работу
+```
+kubectl apply -f ui-deployment.yml -n dev
+```
+
+## Работа c kubernetes
+- Создаем кластер в GCE , подключаемся и создаем dev-namespace, разворачиваем наши приложения
+
+```
+kubectl apply -f ./kubernetes/reddit/dev-namespace.yml
+kubectl apply -f ./kubernetes/reddit/ -n dev
+```
+- Создаем правило фаерволла, разрешаем доступ по портам 30000-32767
+```
+kubectl get nodes -o wide
+NAME                                       STATUS   ROLES    AGE   VERSION         INTERNAL-IP   EXTERNAL-IP     OS-IMAGE                             KERNEL-VERSION   CONTAINER-RUNTIME
+gke-cluster-1-default-pool-8c46a28e-lr5r   Ready    <none>   18m   v1.11.8-gke.6   10.132.0.12   34.76.165.70    Container-Optimized OS from Google   4.14.91+         docker://17.3.2
+gke-cluster-1-default-pool-8c46a28e-md69   Ready    <none>   18m   v1.11.8-gke.6   10.132.0.13   23.251.130.14   Container-Optimized OS from Google   4.14.91+         docker://17.3.2
+alexis@inkdev:~/inkdev_microservices/kubernetes/reddit$
+alexis@inkdev:~/inkdev_microservices/kubernetes/reddit$
+alexis@inkdev:~/inkdev_microservices/kubernetes/reddit$
+alexis@inkdev:~/inkdev_microservices/kubernetes/reddit$
+alexis@inkdev:~/inkdev_microservices/kubernetes/reddit$  kubectl describe service ui -n dev | grep NodePort
+Type:                     NodePort
+NodePort:                 <unset>  32092/TCP
+
+```
+- Заходим по вненешнему адресу, убеждаемся, что все работает
+- Подключаем kubernetes dashboard. Включаем соответствующую опцию в конфигурации, стартуем proxy
+```
+kubectl proxy
+Starting to serve on 127.0.0.1:8001
+
+```
+- По ссылке из руководства не заработало, поднялось только со ссылкой
+http://localhost:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy
+Описание проблемы:https://github.com/kubernetes/dashboard/issues/3038 + на vps поднять ssh-туннель
+- Настраиваем RBAC
+Расширяем права cluster-admin
+```
+kubectl create clusterrolebinding kubernetes-dashboard  --clusterrole=cluster-admin --serviceaccount=kube-system:kubernetes-dashboard
+clusterrolebinding.rbac.authorization.k8s.io/kubernetes-dashboard created
+```
+
+### Задание с *
+- Разворачиваем кластер с помощью Terraform. Необходимые файлы поместили в каталог kubernetes/terraform. Для развертывания приложения используем скрипт deploy.sh
+Создали и проверили развертывание
+```
+terraform init
+terraform init
+terraform init
+```
+- Создали манифест dashboard-kubernetes.yml для включения дашбоарда kubernetes
+
+
+
+
+

@@ -1,4 +1,6 @@
 *.ini
 *.env
+*.tfvars
+.terraform/
 
 
