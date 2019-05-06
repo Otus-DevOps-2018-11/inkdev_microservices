@@ -1840,6 +1840,134 @@ terraform init
 - Создали манифест dashboard-kubernetes.yml для включения дашбоарда kubernetes
 
 
+### Домашнее задание №27(kubernetes-3)
+Полезные команды
+```
+kubectl get services -n dev
+```
 
+Настройка LoadBalancer
+- Меняем тип и порт подключения для loadbalancer
+```
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    nodePort: 32092
+    protocol: TCP
+    targetPort: 9292
+  selector:
+    app: reddit
+    component: ui
+```
+Проверка
+```
+ kubectl get service  -n dev --selector component=ui
+NAME   TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)        AGE
+ui     LoadBalancer   10.47.250.96   35.195.252.157   80:32092/TCP   21m
 
+curl http://35.195.252.157
+```
 
+Ingress Controller
+- Создаем Ingress для сервиса UI ui-ingress.yml
+- Проверяем в кластере
+```
+kubectl get ingress -n dev
+NAME   HOSTS   ADDRESS          PORTS   AGE
+ui     *       35.244.192.207   80      3m
+```
+
+Установка Secret
+Выпускаем сертификат, загружаем в kuber и проверяем
+```
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=35.244.192.207"
+kubectl create secret tls ui-ingress --key tls.key --cert tls.crt -n dev
+ kubectl describe secret ui-ingress -n dev
+Name:         ui-ingress
+Namespace:    dev
+Labels:       <none>
+Annotations:  <none>
+
+Type:  kubernetes.io/tls
+
+Data
+====
+tls.key:  1708 bytes
+tls.crt:  1111 bytes
+```
+
+### Задание со *
+Опишем установку объекта Secret с помощью манифеста ui-ingress-secret.yml
+
+Network policy
+Получаем имя кластера
+```
+gcloud beta container clusters list
+NAME       LOCATION        MASTER_VERSION  MASTER_IP       MACHINE_TYPE  NODE_VERSION  NUM_NODES  STATUS
+cluster-1  europe-west1-c  1.11.8-gke.6    35.241.199.218  g1-small      1.11.8-gke.6  2          RUNNING
+```
+Включаем network-policy для gke
+```
+gcloud beta container clusters update cluster-1 --zone=europe-west1-c --update-addons=NetworkPolicy=ENABLED 
+gcloud beta container clusters update cluster-1 --zone=europe-west1-c --enable-network-policy
+```
+Разворачиваем network-policy для mongo, обеспечиваем доступность post-сервиса до базы
+```
+- podSelector:
+            matchLabels:
+              app: reddit
+              component: post
+``` 
+Хранилище для базы
+- Подключаем volume через манифест mongo-deployment.yml
+- Создаем пост в приложении
+- Удаляем deployment mongo, пост исчез
+- Применяем заново, создаем новый пост
+
+Подключаем внешнее хранилище gcePersistentDisk
+```
+gcloud compute disks create --size=25GB --zone=europe-west1-c reddit-mongo-disk
+```
+- Объявляем в манифесте и пересоздаем mongo-deployment
+- Пересоздаем Pod, создаем пост и удаляем deployment
+- Снова создаем deployment, убеждаемся, что пост на месте
+
+PersistentVolume
+- Создаем манифест mongo-volume.yml
+- Добавляем persistentVolume в кластер
+
+PersistentVolumeClaim(запрос на выдачу ресурса)
+- Создаем манифест mongo-claim
+- Проверяем распределение pv
+```
+kubectl describe storageclass standard -n dev
+Name:                  standard
+IsDefaultClass:        Yes
+Annotations:           storageclass.beta.kubernetes.io/is-default-class=true
+Provisioner:           kubernetes.io/gce-pd
+Parameters:            type=pd-standard
+AllowVolumeExpansion:  <unset>
+MountOptions:          <none>
+ReclaimPolicy:         Delete
+VolumeBindingMode:     Immediate
+Events:                <none>
+
+```  
+- Подключаем PVC к нашим подам
+
+StorageClass
+- Добавляем StorageClass в кластер
+```
+kubectl apply -f storage-fast.yml -n dev
+```
+- Создадим описание PersistentVolumeClaim
+- Проверяем
+```
+  kubectl get persistentvolume -n dev
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM                   STORAGECLASS   REASON   AGE
+pvc-a5caeea6-7006-11e9-b759-42010a8401dd   15Gi       RWO            Delete           Bound       dev/mongo-pvc           standard                16m
+pvc-b4faf4d5-7008-11e9-b759-42010a8401dd   10Gi       RWO            Delete           Bound       dev/mongo-pvc-dynamic   fast                    1m
+reddit-mongo-disk                          25Gi       RWO            Retain           Available                                                   21m
+
+```
