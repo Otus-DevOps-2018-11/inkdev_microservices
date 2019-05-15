@@ -1971,3 +1971,55 @@ pvc-b4faf4d5-7008-11e9-b759-42010a8401dd   10Gi       RWO            Delete     
 reddit-mongo-disk                          25Gi       RWO            Retain           Available                                                   21m
 
 ```
+
+### Домашнее задание №28(kubernetes-4)
+```
+kubectl config set-context #смена контекста
+```
+- Создаем манифест и запускаем tiller-сервер
+```
+helm init --service-account tiller
+kubectl get pods -n kube-system --selector app=helm 
+```
+- Конфигурируем и устанавливаем chart ui
+```
+helm install --name test-ui-1 ui/
+$ helm ls
+NAME            REVISION        UPDATED                         STATUS          CHART           APP VERSION     NAMESPACE
+test-ui-1       1               Tue May  7 14:03:11 2019        DEPLOYED        ui-1.0.0        1               default
+
+```
+- Шаблонизируем и запускаем несколько копий
+- Добавляем аналогичные шаблоны для comment и post
+- Создаем файл _helpers.tpl в каждой из папок templates для post, ui и comment
+- Добавляем функцию <service>.fullname в файлы _helpers.tpl
+- Создаем чарт Reddit для объединения приложений, проверяем работоспособность
+
+Gitlab
+- Расширяем кластер на одну ноду с параметрами n1-standard-2, отключаем rbac
+- Устанавливаем сборку omnibus
+```
+ helm repo add gitlab https://charts.gitlab.io
+ helm fetch gitlab/gitlab-omnibus --version 0.1.37 --untar
+ cd gitlab-omnibus
+```
+- Правим файлы
+```
+gitlab-omnibus/values.yaml
+gitlab-omnibus/templates/gitlab/gitlab-svc.yaml
+gitlab-omnibus/templates/gitlab-config.yaml
+gitlab-omnibus/templates/ingress/gitlab-ingress.yaml 
+```
+- Создаем группу reddit
+- Создаем проекты reddit-deploy, post, ui, comment, добавляем необходимые манифесты
+- Проверяем корректность работы пайплайнов
+- Проверяем работу динамического создания и удаления окружений
+- Проверяем деплой в staging и production
+
+
+
+
+
+
+
+
