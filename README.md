@@ -2017,6 +2017,85 @@ gitlab-omnibus/templates/ingress/gitlab-ingress.yaml
 - Проверяем деплой в staging и production
 
 
+### Домашнее задание №29(kubernetes-5)
+```
+gcloud beta container clusters update cluster-1 --monitoring-service none --project=docker-236508 --zone=europe-west1-c
+gcloud beta container clusters update cluster-1 --logging-service none --project=docker-236508 --zone=europe-west1-c
+kubectl apply -f tiller.yml
+helm init --service-account tiller
+kubectl get pods -n kube-system --selector app=helm
+```
+- Устанавливаем ingress
+```
+helm install stable/nginx-ingress --name nginx
+kubectl get svc
+```
+- Устанавливаем Prometheus
+```
+cd kubernetes/charts && helm fetch --untar stable/prometheus
+```
+- Создаем файл custom_values.yml с частью отключенных сервисов и запускаем Prometheus
+```
+helm upgrade prom . -f custom_values.yml --install
+```
+- Заходим по адресу http://reddit-prometheus. Проверяем Targets
+- Проверяем работоспособность metrics
+- Подключаем kube-state-metrics
+- Подключаем поды node-exporter, в Targets появились три новых метрики
+- Запускаем приложение
+```
+helm upgrade reddit-test ./reddit —install
+helm upgrade production --namespace production ./reddit --install
+helm upgrade staging --namespace staging ./reddit --install
+``` 
+- Используем механизм SD для обнаружения приложений в k8s
+- Обновляем лейбелы
+```
+helm upgrade prom . -f custom_values.yml --install
+```
+- Добавляем label для prometheus
+- Добавляем метки kubernetes_name и kubernetes_namespace и включаем их отображение
+- Добавляем job reddit-production
+- Разбиваем job reddit-endpoints на джобы post-endpoints, commentendpoints, ui-endpoints
+- С помощью Helm устанавливаем grafana
+```
+$ helm upgrade --install grafana stable/grafana --set "adminPassword=admin" \
+--set "service.type=NodePort" \
+--set "ingress.enabled=true" \
+--set "ingress.hosts={reddit-grafana}"
+
+```
+- Выбираем datasource prometheus, добавляем дашбоард для kubernetes
+- Добавляем собственные дашбоарды из предыдущего дз по мониторингу
+- Настроим templating для использования соответствующих namespaces
+- Выгружаем дашбоарды с новыми параметрами
+- Импортируем смешанный график с id 741
+
+Логирование
+- Присвоили метку самой большой ноде в кластере
+```
+kubectl label node gke-cluster-1-bigpool-677470d8-zfrg elastichost=true
+```
+- В папке kubernetes/efk создаем файлы манифестов
+- Запускаем
+```
+kubectl apply -f ./efk
+```
+- Устанавливаем Kibana из helm чарта
+```
+helm upgrade --install kibana stable/kibana \
+--set "ingress.enabled=true" \
+--set "ingress.hosts={reddit-kibana}" \
+--set "env.ELASTICSEARCH_URL=http://elasticsearch-logging:9200" \
+--version 0.1.1
+```
+- Создали шаблон индекса и отфильтровали по выражению
+```
+kubernetes.labels.component:post OR kubernetes.labels.component:comment OR
+kubernetes.labels.component:ui 
+```
+
+
 
 
 
